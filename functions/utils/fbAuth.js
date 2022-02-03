@@ -36,6 +36,7 @@ exports.protect = (req, res, next) => {
       req.user.industry = data.docs[0].data().industry;
       req.user.userType = data.docs[0].data().userType;
       req.user.backgroundImage = data.docs[0].data().backgroundImage;
+      req.user.isPartner = data.docs[0].data().isPartner;
       return next();
     })
     .catch((err) => {

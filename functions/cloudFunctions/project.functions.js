@@ -13,12 +13,12 @@ exports.newArticlePendingNotification = functions
         return db.doc(`notifications/${snapshot.id}`).set({
           createdAt: new Date().toISOString(),
           recipient: snapshot.data().userId,
-          sender: 'justappli',
+          sender: 'levls',
           message: `Your project, ${title} is pending verification.`,
           type: 'project pending',
           read: false,
-          avatar: ''
-        })
+          avatar: '',
+        });
       })
     .catch((err) => console.error(err));   
 })
@@ -32,17 +32,19 @@ exports.articleActiveNotification = functions
     const title = oldData.title
 
     if (oldData.isActive !== newData.isActive) {
-      return db.collection('notifications').add({
-        createdAt: new Date().toISOString(),
-        recipient: oldData.userId,
-        sender: 'justappli',
-        message: `Your project, ${title} is now active.`,
-        type: 'project active',
-        read: false,
-        avatar: '',
-        postId: oldData.projectId,
-      })
-      .catch((err) => console.error(err));  
+      return db
+        .collection('notifications')
+        .add({
+          createdAt: new Date().toISOString(),
+          recipient: oldData.userId,
+          sender: 'levls',
+          message: `Your project, ${title} is now active.`,
+          type: 'project active',
+          read: false,
+          avatar: '',
+          postId: oldData.projectId,
+        })
+        .catch((err) => console.error(err));  
     }    
 })
 

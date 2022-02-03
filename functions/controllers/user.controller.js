@@ -8,9 +8,6 @@ var request = require('request');
 const firebase = require("firebase");
 firebase.initializeApp(config);
 
-
-
-
 const {
   validateSignupData,
   validateLoginData,
@@ -53,17 +50,17 @@ exports.signup = (req, res) => {
   const batch = db.batch();
 
   const adminMsg = {
-    to: 'admin@justappli.co.uk', // recipient
-    from: 'Justappli. <noreply@justappli.co.uk>',
+    to: 'admin@levls.io', // recipient
+    from: 'LEVLS. <noreply@levls.io>',
     subject: `New user sign up - ${req.body.username}`,
     text: `${req.body.username}, just created an account`,
     html: `
         <h3> Hello Admin </h3>
-        <p>You have a new ${req.body.userType || "Personal"} user.</p>
+        <p>You have a new ${req.body.userType || 'Personal'} user.</p>
         <p>Thank You.</p>
-        <p>JustAppli</p>
-      ` 
-  }
+        <p>LEVLS</p>
+      `,
+  };
 
   const newUser = {
     username: req.body.username,
@@ -108,12 +105,12 @@ exports.signup = (req, res) => {
         userId,
         bio: '',
         CV: '',
-        website: '', 
-        slogan: '',    
+        website: '',
+        slogan: '',
         founded: '',
         industry: '',
         companySize: '',
-        organisationType: '',   
+        organisationType: '',
         numberOrname: '',
         street: '',
         city: 'London',
@@ -124,15 +121,16 @@ exports.signup = (req, res) => {
         userType: newUser.userType,
         isAdmin: false,
         verified: false,
-        acceptedTerms:true,
+        acceptedTerms: true,
         isActive: false,
+        isPartner: false,
         deviceToken: newUser.deviceToken,
         instagram: '',
         tiktok: '',
         twitter: '',
         linkedIn: '',
-        profileUrl: ''
-    };
+        profileUrl: '',
+      };
       db.doc(`/users/${userId}`).set(userCredentials);
       return db.collection('usernames').doc(`${newUser.username}`).get();
     })
@@ -995,13 +993,18 @@ exports.activateUser = (req, res) => {
         } else profile = "company-profile"
          
         var options = {
-          'method': 'POST',
-          'url': 'https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=AIzaSyCPQI2SBgcSXOSqfn8SAPTIx8sfb6m92fo',
-          'headers': {
-            'Content-Type': 'application/json'
+          method: 'POST',
+          url: 'https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=AIzaSyCPQI2SBgcSXOSqfn8SAPTIx8sfb6m92fo',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          body: JSON.stringify({"dynamicLinkInfo":{"domainUriPrefix":"https://justappli.page.link","link":`https://justappli.co.uk/${profile}/${req.params.userId}`,"androidInfo":{"androidPackageName":"com.pandabares.justappli"}}})
-        
+          body: JSON.stringify({
+            dynamicLinkInfo: {
+              domainUriPrefix: 'https://levls.page.link',
+              link: `https://levls.io/${profile}/${req.params.userId}`,
+              androidInfo: { androidPackageName: 'com.pandabares.justappli' },
+            },
+          }),
         };
         userData = doc.data();
         username = userData.username
@@ -1297,7 +1300,7 @@ exports.addProfileUrlToAllUsers = (req, res) => {
           'headers': {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({"dynamicLinkInfo":{"domainUriPrefix":"https://justappli.page.link","link":`https://justappli.co.uk/${profile}/${doc.id}`,"androidInfo":{"androidPackageName":"com.pandabares.justappli"}}})
+          body: JSON.stringify({"dynamicLinkInfo":{"domainUriPrefix":"https://levls.page.link","link":`https://levls.io/${profile}/${doc.id}`,"androidInfo":{"androidPackageName":"com.pandabares.justappli"}}})
         };
         return request(options, function (error, response) {
           if (error) throw new Error(error);

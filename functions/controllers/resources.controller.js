@@ -19,10 +19,11 @@ exports.getAllResources = (req, res) => {
           createdAt: doc.data().createdAt,
           uploadUrl: doc.data().uploadUrl,
           contentType: doc.data().contentType,
+          isActive: doc.data().isActive,
           likeCount: doc.data().likeCount,
           commentCount: doc.data().commentCount,
           viewsCount: doc.data().viewsCount,
-          resourceType: doc.data().resourceType
+          resourceType: doc.data().resourceType,
         });
         
       });
@@ -54,11 +55,11 @@ exports.getAllOrgResources = (req, res) => {
           createdAt: doc.data().createdAt,
           uploadUrl: doc.data().uploadUrl,
           contentType: doc.data().contentType,
+          isActive: doc.data().isActive,
           likeCount: doc.data().likeCount,
           commentCount: doc.data().commentCount,
-          isActive: doc.data().isActive,
           viewsCount: doc.data().viewsCount,
-          resourceType: doc.data().resourceType
+          resourceType: doc.data().resourceType,
         });
         
       });
@@ -187,6 +188,7 @@ exports.createResource = (req, res) => {
       newResource.userId = userId;
       newResource.username = username;
       newResource.contentType = 'resources';
+      newResource.isActive = false;
       newResource.imageUrl = imageUrl;
       newResource.createdAt = new Date().toISOString();
       newResource.post_time_stamp = Date.parse(post_time_stamp)

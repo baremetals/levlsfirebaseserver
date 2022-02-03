@@ -9,15 +9,15 @@ exports.verifyEmail = functions
     const data = snap.data()
     const msg = {
       to: `${data.email}`, // recipient
-      from: 'Justappli. <noreply@justappli.co.uk>', // Change to verified sender
+      from: 'LEVLS. <noreply@levls.io>', // Change to verified sender
       template_id: 'd-558f2d5a214649c7bcccc1f2e30df393',
       dynamic_template_data: {
         subject: 'Thanks for signing up',
         username: data.username,
-        url: `https://justappli.co.uk/signup/${data.userId}`,
-        buttonText: 'Verify email now'
+        url: `https://levls.io/signup/${data.userId}`,
+        buttonText: 'Verify email now',
       },
-    }
+    };
 
     await sgMail
       .send(msg)
@@ -50,9 +50,9 @@ exports.welcomeEmail = functions
     const batch = db.batch();
     const msg = {
       to: `${newData.email}`, // recipient
-      from: 'Justappli. <noreply@justappli.co.uk>', // Change to verified sender
+      from: 'LEVLS. <noreply@levls.io>', // Change to verified sender
       template_id: 'd-c6f168fa8a394bc7b11699c29b868b01',
-    }
+    };
     if (oldData.verified !== newData.verified) {      
       await sgMail
       .send(msg)
@@ -257,7 +257,7 @@ exports.userNameChangeNotification = functions
               type: 'username',
               read: false,
               recipient: change.before.data().userId,
-              sender: 'justappli',
+              sender: 'levls',
               avatar: '',
               notificationId: change.before.data().userId
             })
@@ -484,19 +484,17 @@ exports.onUserImageChange = functions
             const following = db.doc(`users/${userId}/followings/${doc.id}`);
             batch.update(following, { followedUserImageUrl: change.after.data().imageUrl });
           })
-          return db
-          .collection('notifications')
-          .add({
-              createdAt: new Date().toISOString(),
-              message: `your image has been updated
+          return db.collection('notifications').add({
+            createdAt: new Date().toISOString(),
+            message: `your image has been updated
               If this wasn't you please contact us.`,
-              type: 'image update',
-              read: false,
-              recipient: change.before.data().userId,
-              sender: 'justappli',
-              avatar: '',
-              notificationId: change.before.data().userId
-            })
+            type: 'image update',
+            read: false,
+            recipient: change.before.data().userId,
+            sender: 'levls',
+            avatar: '',
+            notificationId: change.before.data().userId,
+          });
         })
         .then(() => {
           return batch.commit();
@@ -510,8 +508,8 @@ exports.onUserDataChange = functions
   .region('europe-west2')
   .firestore.document('/users/{userId}')
   .onUpdate((change) => {
-    const newData = change.after.data()
-    const oldData = change.before.data()
+    const newData = change.after.data();
+    const oldData = change.before.data();
     // const newUserName = newData.username
 
     // if (oldData.imageUrl !== newData.imageUrl) {
@@ -523,7 +521,7 @@ exports.onUserDataChange = functions
     //           type: 'Profile Image',
     //           read: false,
     //           recipient: snapshot.data().userId,
-    //           sender: 'justappli',
+    //           sender: 'levls',
     //           avatar: '',
     //           notificationId: snapshot.id
     //         })
@@ -539,7 +537,7 @@ exports.onUserDataChange = functions
     //           type: 'username',
     //           read: false,
     //           recipient: snapshot.data().userId,
-    //           sender: 'justappli',
+    //           sender: 'levls',
     //           avatar: '',
     //           notificationId: snapshot.id
     //         })
@@ -551,16 +549,17 @@ exports.onUserDataChange = functions
     //     type: 'Details Update',
     //     read: false,
     //     recipient: change.before.data().userId,
-    //     sender: 'justappli',
+    //     sender: 'levls',
     //     avatar: ''
     //   })
     // }
-    if (oldData.username !== newData.username
-      || oldData.imageUrl !== newData.imageUrl
-      || oldData.followersCount !== newData.followersCount
-      || oldData.followingCount !== newData.followingCount
-      ) {
-        return true;
+    if (
+      oldData.username !== newData.username ||
+      oldData.imageUrl !== newData.imageUrl ||
+      oldData.followersCount !== newData.followersCount ||
+      oldData.followingCount !== newData.followingCount
+    ) {
+      return true;
     } else {
       return db.collection('notifications').add({
         createdAt: new Date().toISOString(),
@@ -568,12 +567,11 @@ exports.onUserDataChange = functions
         type: 'details update',
         read: false,
         recipient: change.before.data().userId,
-        sender: 'justappli',
-        avatar: ''
-      })
+        sender: 'levls',
+        avatar: '',
+      });
     }
-    
-});
+  });
 
 // Delete a user
 exports.onDeleteUser = functions

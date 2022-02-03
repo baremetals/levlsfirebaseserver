@@ -65,9 +65,8 @@ exports.contactUs = (req, res) => {
   // db.collection('contact us').add(contact)
 
     const msg = {
-      
       to: `${contact.email}`, // recipient
-      from: 'noreply@justappli.co.uk', // Change to verified sender
+      from: 'noreply@levls.io', // Change to verified sender
       subject: 'Contact us',
       text: 'We received your message.',
       html: `
@@ -75,9 +74,9 @@ exports.contactUs = (req, res) => {
         <p>Thank you for reaching out. ...</p>
         <p>We endeavour to get back to you within 48 hours.</p>
         <p>Thank You.</p>
-        <p>JustAppli Team</p>
-      ` 
-    }
+        <p>LEVLS Team</p>
+      `,
+    };
     sgMail
       .send(msg)
       .then(() => {        

@@ -13,7 +13,7 @@ exports.newArticlePendingNotification = functions
         return db.doc(`notifications/${snapshot.id}`).set({
           createdAt: new Date().toISOString(),
           recipient: snapshot.data().userId,
-          sender: 'justappli',
+          sender: 'levls',
           message: `Your news article, ${title} is pending verification.`,
           type: 'news article pending',
           read: false,
@@ -35,7 +35,7 @@ exports.articleActiveNotification = functions
       return db.collection('notifications').add({
         createdAt: new Date().toISOString(),
         recipient: oldData.userId,
-        sender: 'justappli',
+        sender: 'levls',
         message: `Your news article, ${title} is now active.`,
         type: 'news article active',
         read: false,

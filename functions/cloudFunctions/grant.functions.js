@@ -12,12 +12,12 @@ exports.newGrantPendingNotification = functions
         return db.doc(`notifications/${snapshot.id}`).set({
           createdAt: new Date().toISOString(),
           recipient: snapshot.data().userId,
-          sender: 'justappli',
+          sender: 'levls',
           message: `Your grant, ${title} is pending verification.`,
           type: 'grant pending',
           read: false,
-          avatar: ''
-        })
+          avatar: '',
+        });
       })
     .catch((err) => console.error(err));   
 })
@@ -31,17 +31,19 @@ exports.grantActiveNotification = functions
     const title = oldData.title
 
     if (oldData.isActive !== newData.isActive) {
-      return db.collection('notifications').add({
-        createdAt: new Date().toISOString(),
-        recipient: oldData.userId,
-        sender: 'justappli',
-        message: `Your grant, ${title} is now active.`,
-        type: 'grant active',
-        read: false,
-        avatar: '',
-        postId: oldData.grantId,
-      })
-      .catch((err) => console.error(err));  
+      return db
+        .collection('notifications')
+        .add({
+          createdAt: new Date().toISOString(),
+          recipient: oldData.userId,
+          sender: 'levls',
+          message: `Your grant, ${title} is now active.`,
+          type: 'grant active',
+          read: false,
+          avatar: '',
+          postId: oldData.grantId,
+        })
+        .catch((err) => console.error(err));  
     }    
 })
 
@@ -53,15 +55,17 @@ exports.newGrantApplicationNotification = functions
   .onCreate((snapshot) => {
     const data = snapshot.data()
 
-    return db.doc(`/notifications/${snapshot.id}`).set({
-      createdAt: new Date().toISOString(),
-      message: `Your ${data.grantType}, ${data.grantTitle} has received 
+    return db
+      .doc(`/notifications/${snapshot.id}`)
+      .set({
+        createdAt: new Date().toISOString(),
+        message: `Your ${data.grantType}, ${data.grantTitle} has received 
       a new application from ${data.organisationName}`,
-      type: 'new grant application',
-      read: false,
-      recipient: data.grantHostUserId,
-      sender: 'justappli',
-      avatar: data.applicantImageUrl
-    })
-    .catch((err) => console.error(err));   
+        type: 'new grant application',
+        read: false,
+        recipient: data.grantHostUserId,
+        sender: 'levls',
+        avatar: data.applicantImageUrl,
+      })
+      .catch((err) => console.error(err));   
 })

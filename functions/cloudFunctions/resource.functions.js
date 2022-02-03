@@ -13,12 +13,12 @@ exports.newResourcePendingNotification = functions
         return db.doc(`notifications/${snapshot.id}`).set({
           createdAt: new Date().toISOString(),
           recipient: snapshot.data().userId,
-          sender: 'justappli',
+          sender: 'levls',
           message: `Your resource, ${title} is pending verification.`,
           type: 'resource pending',
           read: false,
-          avatar: ''
-        })
+          avatar: '',
+        });
       })
     .catch((err) => console.error(err));   
 })
@@ -32,17 +32,19 @@ exports.resourceActiveNotification = functions
     const title = oldData.title
 
     if (oldData.isActive !== newData.isActive) {
-      return db.collection('notifications').add({
-        createdAt: new Date().toISOString(),
-        recipient: oldData.userId,
-        sender: 'justappli',
-        message: `Your resource, ${title} is now active.`,
-        type: 'resource active',
-        read: false,
-        avatar: '',
-        postId: oldData.resourceId,
-      })
-      .catch((err) => console.error(err));  
+      return db
+        .collection('notifications')
+        .add({
+          createdAt: new Date().toISOString(),
+          recipient: oldData.userId,
+          sender: 'levls',
+          message: `Your resource, ${title} is now active.`,
+          type: 'resource active',
+          read: false,
+          avatar: '',
+          postId: oldData.resourceId,
+        })
+        .catch((err) => console.error(err));  
     }    
 })
 

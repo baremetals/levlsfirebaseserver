@@ -8,16 +8,18 @@ exports.newEventNotification = functions
   .onCreate((snapshot) => {
     const data = snapshot.data()
 
-    return db.doc(`/notifications/${snapshot.id}`).set({
-      createdAt: new Date().toISOString(),
-      message: `The event ${data.title} has been created.`,
-      type: 'new event',
-      read: false,
-      recipient: doc.data().userId,
-      sender: 'justappli',
-      avatar: ''
-    })
-    .catch((err) => console.error(err));   
+    return db
+      .doc(`/notifications/${snapshot.id}`)
+      .set({
+        createdAt: new Date().toISOString(),
+        message: `The event ${data.title} has been created.`,
+        type: 'new event',
+        read: false,
+        recipient: doc.data().userId,
+        sender: 'levls',
+        avatar: '',
+      })
+      .catch((err) => console.error(err));   
 })
 
 // **New comment notification for event - for hosts**
