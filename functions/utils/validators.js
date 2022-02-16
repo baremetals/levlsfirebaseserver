@@ -1,9 +1,10 @@
 const validator = require('validator');
 
+// /^[a-zA-0-9\d-\_]*$/
   
 exports.validateSignupData = (data) => {
     let errors = {};
-    let regex = /^[a-zA-0-9\d-_]*$/
+    let regex = /^[a-z0-9_\-]+$/;
   
     if (data.email.trim() === '') {
       errors.error = 'Please enter an email address.';

@@ -26,7 +26,8 @@ exports.getAllArticles = (req, res) => {
           likeCount: doc.data().likeCount,
           commentCount: doc.data().commentCount,
           isActive: doc.data().isActive,
-          viewsCount: doc.data.viewsCount
+          viewsCount: doc.data().viewsCount,
+          isPartner: doc.data().isPartner
         });
         
       });
@@ -79,7 +80,8 @@ exports.writeAnArticle = (req, res) => {
       commentCount: 0,
       contentType: 'article',
       isActive: false,
-      viewsCount: 0 
+      viewsCount: 0,
+      isPartner: req.user.isPartner
     };
 
     db.collection('articles')
@@ -102,6 +104,7 @@ exports.writeAnArticle = (req, res) => {
     const imageUrl = req.user.imageUrl
     const userId = req.user.userId
     const username = req.user.username
+    const isPartner = req.user.isPartner
 
     let imageToBeUploaded = {};
     let imageFileName;
@@ -161,6 +164,7 @@ exports.writeAnArticle = (req, res) => {
       newArticle.commentCount = 0
       newArticle.viewsCount = 0
       newArticle.isActive = false
+      newArticle.isPartner = isPartner
       db.collection('articles')
         .add(newArticle)
         .then((doc) => {

@@ -24,7 +24,8 @@ exports.getAllPosts = (req, res) => {
           category: doc.data().category,
           likeCount: doc.data().likeCount,
           commentCount: doc.data().commentCount,
-          viewsCount: doc.data.viewsCount
+          viewsCount: doc.data().viewsCount,
+          isPartner: doc.data().isPartner,
         });
         
       });
@@ -110,8 +111,8 @@ exports.createPost = (req, res) => {
       likeCount: 0,
       commentCount: 0,
       contentType: 'news',
-      viewsCount: 0 
-      
+      viewsCount: 0,
+      isPartner: req.user.isPartner,
     };
 
     db.collection('news')
@@ -134,6 +135,7 @@ exports.createPost = (req, res) => {
     const imageUrl = req.user.imageUrl
     const userId = req.user.userId
     const username = req.user.username
+    const isPartner = req.user.isPartner;
 
     let imageToBeUploaded = {};
     let imageFileName;
@@ -191,6 +193,7 @@ exports.createPost = (req, res) => {
       newArticle.likeCount = 0
       newArticle.commentCount = 0
       newArticle.viewsCount = 0
+      newArticle.isPartner = isPartner;
       db.collection('news')
         .add(newArticle)
         .then((doc) => {

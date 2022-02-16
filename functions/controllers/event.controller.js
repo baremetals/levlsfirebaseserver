@@ -29,7 +29,8 @@ exports.getAllEvents = (req, res) => {
           imageUrl: doc.data().imageUrl,
           username: doc.data().username,
           userId: doc.data().userId,
-          viewsCount: doc.data().viewsCount
+          viewsCount: doc.data().viewsCount,
+          isPartner: doc.data().isPartner
         });
       });
       return res.json(events);
@@ -51,6 +52,7 @@ exports.createEvent = (req, res) => {
   const imageUrl = req.user.imageUrl
   const userId = req.user.userId
   const username = req.user.username
+  const isPartner = req.user.isPartner;
   let docId;
 
   let imageToBeUploaded = {};
@@ -111,6 +113,7 @@ exports.createEvent = (req, res) => {
     newEvent.commentCount = 0
     newEvent.viewsCount = 0
     newEvent.isActive = false
+    newEvent.isPartner = isPartner
     db.collection('events')
       .add(newEvent)
       .then((doc) => {
