@@ -1,25 +1,25 @@
 const express = require('express')
 const FBAuth = require('../utils/fbAuth');
 const {
-    // signup,
-    // changeUsername,
-    // uploadImage,
-    // editUserDetails,
-    // getAuthenticatedUser,
-    // getUserData,
-    // followUser,
-    // removeFollowing,
-    // removeFollower,
-    // getAllUsers,
-    // resetPassword,
-    // updatePassword,
-    // updateEmailAdd,
-    // getAllUsernames,
-    // activateUser,
-    // adminLogin,
-    // handleChange
-    //markNotificationsRead
-    contactUs
+  // signup,
+  // changeUsername,
+  // uploadImage,
+  // editUserDetails,
+  getAdminUser,
+  // getUserData,
+  // followUser,
+  // removeFollowing,
+  // removeFollower,
+  // getAllUsers,
+  // resetPassword,
+  // updatePassword,
+  // updateEmailAdd,
+  // getAllUsernames,
+  // activateUser,
+  adminLogin,
+  // handleChange
+  //markNotificationsRead
+  contactUs,
 } = require('../controllers/admin.controller');
 
 const router = express.Router()
@@ -27,12 +27,12 @@ const router = express.Router()
 router.route('/contact-us')
   .post(contactUs)
 
-// router.route('/admin/signup')
+// router.route('/admin/register')
 //   .post(signup)
 
 
-// router.route('/admin/login')
-//   .post(adminLogin)
+router.route('/admin/login')
+  .post(adminLogin)
 
 // router.route('/user/image')
 //   .post( FBAuth.protect, uploadImage)
@@ -49,15 +49,10 @@ router.route('/contact-us')
 // router.route('/user/:userId')
 //   .get(getUserData)
 
-// router.route('/user')
-//   .post(FBAuth.protect, editUserDetails)
-//   .get(FBAuth.protect, getAuthenticatedUser)
+router.route('/admin/user')
+  .get(FBAuth.restrictToAdmin, getAdminUser);
+  //   .post(FBAuth.protect, editUserDetails)
 
-// router.route('/user/:userId/follow')
-//   .get(FBAuth.protect, followUser)
-
-// router.route('/user/:userId/unfollow')
-//   .get(FBAuth.protect, removeFollowing, removeFollower)
 
 // router.route('/users')
 //   .get(FBAuth.restrictToAdmin, getAllUsers)

@@ -15,43 +15,92 @@ const {
     // validatePasswordChange
 } = require("../utils/validators");
 
-exports.adminLongin = (req, res) => {
+exports.adminLogin = (req, res) => {
     const user = {
       email: req.body.email,
       password: req.body.password,
     };
+
+    let userDoc;
+    const getUser = db
+      .collection('users')
+      .where('email', '==', user.email)
+      .limit(1);
+
   
     const { valid, errors } = validateLoginData(user);
   
     if (!valid) return res.status(400).json(errors);
-  
-    firebase
-      .auth()
-      .getUserByEmail(user.email)
-      .then((userRecord) => {
-        if (userRecord.isAdmin != false) {
-          return firebase.auth()
-            .signInWithEmailAndPassword(user.email, user.password)
-            .then((data) => {
-            return data.user.getIdToken();
-            })
-            .then((token) => {
-            return res.json({ token });
-             })
-            .catch((err) => {
-            console.error(err);
+
+    getUser
+      .get()
+      .then((data) => {
+        if (data) {;
+          data.forEach((doc) => {
+            userDoc = doc.data();
+          });
+          return userDoc;
+        }
+      })
+      .then(() => {
+        if (userDoc.verified !== true) {
+          return res.status(403).json({
+            error:
+              'Please activate this account, check your email for the activation link.',
+          });
+        } else {
+          if (userDoc.isAdmin === true) {;
+            return firebase
+              .auth()
+              .signInWithEmailAndPassword(user.email, user.password)
+              .then((data) => {
+                return data.user.getIdToken();
+              })
+              .then((token) => {;
+                return res.json({ token });
+              })
+              .catch((err) => {;
+                console.error(err);
+                if (err.code.startsWith('auth')) {
+                  return res.status(403).json({
+                    error: 'wrong email or password, please try again',
+                  });
+                } else {
+                  return res
+                    .status(403)
+                    .json({ error: 'wrong credentials, please try again' });
+                }
+              });
+          } else {
             return res
-             .status(403)
-             .json({ general: "This Route Doesn't exist" });
-            });
+              .status(403)
+              .json({ error: 'Yo do not have the right permission to access this route!' });
+          }
         }
       })
       .catch((err) => {
         console.error(err);
         return res
           .status(403)
-          .json({ general: "This Route Doesn't exist" });
+          .json({ general: "Sorry Something Went Wrong" });
       });
+};
+
+// Get Admin user details
+exports.getAdminUser = (req, res) => {
+  let userData = {};
+  db.doc(`/users/${req.user.userId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists) {
+        userData.credentials = doc.data();
+        return res.json(userData);
+      }
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
 };
 
 exports.contactUs = (req, res) => {

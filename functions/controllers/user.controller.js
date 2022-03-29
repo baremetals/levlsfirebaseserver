@@ -1012,7 +1012,8 @@ exports.activateUser = (req, res) => {
         request(options, function (error, response) {
           if (error) throw new Error(error);
           const data = JSON.parse(response.body);
-          profileUrl = data.shortLink
+          console.log(data)
+          profileUrl = data.shortLink? data.shortLink : userData.imageUrl
           userDocument.update({ isActive: true, verified: true, profileUrl: profileUrl });
         });
         db.doc(`/usernames/${username}`).update({ isActive: true });
