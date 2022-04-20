@@ -10,10 +10,12 @@ router.route('/articles')
 router.route('/articles/:userId')
     .get(postHelper.getAllArticles)
 
-router.route('/article/:articleId')
-    .get(postHelper.getAnArticle)
-    .delete(FBAuth.protect, postHelper.deleteArticle)
-    .post(FBAuth.protect, postHelper.updateArticle)
+router.route('/article/:slug').get(postHelper.getAnArticle);
+
+router
+  .route('/articles/:articleId')
+  .delete(FBAuth.protect, postHelper.deleteArticle)
+  .post(FBAuth.protect, postHelper.updateArticle);
 
 router.route('/article/:articleId/like')
     .get(FBAuth.protect, postHelper.likeAnArticle)

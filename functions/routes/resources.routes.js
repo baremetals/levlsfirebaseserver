@@ -11,10 +11,12 @@ router.route('/resources')
 router.route('/resources/:userId')
     .get(postHelper.getAllOrgResources)
 
-router.route('/resource/:resourceId')
-    .get(postHelper.getResource)
-    .delete(FBAuth.protect, postHelper.deleteResource)
-    .post(FBAuth.protect, postHelper.updateResource)
+router.route('/resource/:slug').get(postHelper.getResource)
+
+router
+  .route('/resource/:resourceId')
+  .delete(FBAuth.protect, postHelper.deleteResource)
+  .post(FBAuth.protect, postHelper.updateResource)
 
 router.route('/resource/:resourceId/like')
     .get(FBAuth.protect, postHelper.likeResource)

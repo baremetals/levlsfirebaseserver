@@ -14,6 +14,7 @@ exports.getAllResources = (req, res) => {
           resourceId: doc.id,
           title: doc.data().title,
           shortDescription: doc.data().shortDescription,
+          slug: doc.data().slug,
           content: doc.data().content,
           username: doc.data().username,
           createdAt: doc.data().createdAt,
@@ -48,6 +49,7 @@ exports.getAllOrgResources = (req, res) => {
           resourceId: doc.id,
           title: doc.data().title,
           shortDescription: doc.data().shortDescription,
+          slug: doc.data().slug,
           content: doc.data().content,
           username: doc.data().username,
           userId: doc.data().userId,
@@ -97,10 +99,20 @@ exports.createResource = (req, res) => {
     if (req.body.customUrl.trim() === '') {
       return res.status(400).json({ error: 'Url must not be empty' });
     }
+
+    const slug =
+      req.body.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
+
     const newResource = {
       uploadUrl: req.body.customUrl,
       title: req.body.title,
       shortDescription: req.body.shortDescription,
+      slug,
       content: req.body.content,
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
@@ -183,10 +195,18 @@ exports.createResource = (req, res) => {
     });
 
     busboy.on("finish", () => {
+      const slug =
+        newResource.title
+          .toLowerCase()
+          .replace(/[^\w ]+/g, '')
+          .replace(/ +/g, '-') +
+        '-' +
+        Date.parse(post_time_stamp);
       const uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/resources%2F${imageFileName}?alt=media&token=${generatedToken}`;
       newResource.uploadUrl = uploadUrl;
       newResource.userId = userId;
       newResource.username = username;
+      newResource.slug = slug;
       newResource.contentType = 'resources';
       newResource.isActive = false;
       newResource.imageUrl = imageUrl;
@@ -220,15 +240,21 @@ exports.createResource = (req, res) => {
 // Fetch one resource
 exports.getResource = (req, res) => {
   let resourceData = {};
-  db.doc(`/resources/${req.params.resourceId}`)
+
+  db.collection('resources')
+    .where('slug', '==', req.params.slug)
     .get()
-    .then((doc) => {
-      if (!doc.exists) {
+    .then((data) => {
+      if (data.length === 0) {
         return res.status(404).json({ error: 'Resource not found' });
       }
-      resourceData = doc.data();
-      resourceData.resourceId = doc.id;
-      doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+
+      data.forEach((doc) => {
+        resourceData = doc.data();
+        resourceData.resourceId = doc.id;
+        doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+      });
+      
       return res.json(resourceData);
     })
     .catch((err) => {

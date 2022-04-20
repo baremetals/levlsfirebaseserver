@@ -10,10 +10,12 @@ router.route('/apprenticeships')
 router.route('/apprenticeships/:userId')
     .get(apprenticeHelper.getAllApprenticeships)
 
-router.route('/apprenticeship/:apprenticeshipId')
-    .get(apprenticeHelper.getAnApprenticeship)
-    .delete(FBAuth.protect, apprenticeHelper.deleteAnApprenticeship)
-    .post(FBAuth.protect, apprenticeHelper.updateAnApprenticeship)
+router.route('/apprenticeship/:slug').get(apprenticeHelper.getAnApprenticeship);
+
+router
+  .route('/apprenticeship/:apprenticeshipId')
+  .delete(FBAuth.protect, apprenticeHelper.deleteAnApprenticeship)
+  .post(FBAuth.protect, apprenticeHelper.updateAnApprenticeship);
 
 // router.route('/apprentice-applications/:apprenticeshipId')
 //     .post(FBAuth.protect, apprenticeHelper.submitApprenticeApplication)

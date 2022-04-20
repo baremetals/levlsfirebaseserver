@@ -13,11 +13,12 @@ exports.getAllInternships = (req, res) => {
           internshipId: doc.id,
           title: doc.data().title,
           shortDescription: doc.data().shortDescription,
+          slug: doc.data().slug,
           content: doc.data().content,
           location: doc.data().location,
           username: doc.data().username,
-          userId: req.user.userId,
-          imageUrl: req.user.imageUrl,
+          userId: doc.data().userId,
+          imageUrl: doc.data().imageUrl,
           organisationName: doc.data().organisationName,
           createdAt: doc.data().createdAt,
           contentType: doc.data().contentType,
@@ -25,7 +26,7 @@ exports.getAllInternships = (req, res) => {
           jobType: doc.data().jobType,
           deadline: doc.data().deadline,
           isActive: doc.data().isActive,
-          viewsCount: doc.data().viewsCount
+          viewsCount: doc.data().viewsCount,
         });     
       });     
       return res.json(internships);
@@ -55,11 +56,19 @@ exports.createAnInternship = (req, res) => {
   if (req.user.userType !== "Organisation") {
     return res.status(400).json({ error: 'You are not permitted' });
   } else {
+    const slug =
+      req.body.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
 
     const newInternship = {
       title: req.body.title,
       shortDescription: req.body.shortDescription,
       content: req.body.content,
+      slug,
       jobType: req.body.jobType,
       location: req.body.location,
       deadline: req.body.deadline || "",
@@ -99,14 +108,19 @@ exports.createAnInternship = (req, res) => {
 // Fetch one internship
 exports.getAnInternship = (req, res) => {
   let internshipData = {};
-  db.doc(`/internships/${req.params.internshipId}`)
+
+  db.collection('internships')
+    .where('slug', '==', req.params.slug)
     .get()
-    .then((doc) => {
-      if (!doc.exists) {
+    .then((data) => {
+      if (data.length === 0) {
         return res.status(404).json({ error: 'Internship not found' });
       }
-      internshipData = doc.data();
-      internshipData.internshipId = doc.id;
+      data.forEach((doc) => {
+        internshipData = doc.data();
+        internshipData.internshipId = doc.id;
+      });
+
       return res.json(internshipData);
     })
     .catch((err) => {

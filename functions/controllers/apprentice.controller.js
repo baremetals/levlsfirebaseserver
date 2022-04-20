@@ -13,11 +13,12 @@ exports.getAllApprenticeships = (req, res) => {
           apprenticeshipId: doc.id,
           title: doc.data().title,
           shortDescription: doc.data().shortDescription,
+          slug: doc.data().slug,
           content: doc.data().content,
           location: doc.data().location,
           username: doc.data().username,
-          userId: req.user.userId,
-          imageUrl: req.user.imageUrl,
+          userId: doc.data().userId,
+          imageUrl: doc.data().imageUrl,
           createdAt: doc.data().createdAt,
           contentType: doc.data().contentType,
           deadline: doc.data().deadline,
@@ -25,7 +26,7 @@ exports.getAllApprenticeships = (req, res) => {
           applicationLink: doc.data().applicationLink,
           jobType: doc.data().jobType,
           isActive: doc.data().isActive,
-          viewsCount: doc.data().viewsCount
+          viewsCount: doc.data().viewsCount,
         });
         
       });
@@ -57,16 +58,24 @@ exports.createAnApprenticeship = (req, res) => {
   if (req.user.userType !== "Organisation") {
     return res.status(400).json({ error: 'You are not permitted' });
   } else {
+    const slug =
+      req.body.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
 
     const newApprentice = {
       title: req.body.title,
       shortDescription: req.body.shortDescription,
       content: req.body.content,
+      slug,
       jobType: req.body.jobType,
       location: req.body.location,
-      deadline: req.body.deadline || "",
+      deadline: req.body.deadline || '',
       howtoApply: req.body.howtoApply,
-      applicationLink: req.body.applicationLink || "",
+      applicationLink: req.body.applicationLink || '',
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
       username: req.user.username,
@@ -75,8 +84,7 @@ exports.createAnApprenticeship = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'apprenticeship',
       isActive: false,
-      applicantCount: 0
-      
+      applicantCount: 0,
     };
   
     db.collection('apprenticeships')
@@ -100,14 +108,17 @@ exports.createAnApprenticeship = (req, res) => {
 // Fetch one apprenticeship
 exports.getAnApprenticeship = (req, res) => {
   let apprenticeshipData = {};
-  db.doc(`/apprenticeships/${req.params.apprenticeshipId}`)
+  db.collection('apprenticeships')
+    .where('slug', '==', req.params.slug)
     .get()
-    .then((doc) => {
-      if (!doc.exists) {
+    .then((data) => {
+      if (data.length === 0) {
         return res.status(404).json({ error: 'Apprenticeship not found' });
       }
-      apprenticeshipData = doc.data();
-      apprenticeshipData.apprenticeshipId = doc.id;
+      data.forEach((doc) => {
+        apprenticeshipData = doc.data();
+        apprenticeshipData.apprenticeshipId = doc.id;
+      });
       return res.json(apprenticeshipData);
     })
     .catch((err) => {

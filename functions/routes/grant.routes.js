@@ -10,10 +10,12 @@ router.route('/grants')
 router.route('/grants/:userId')
     .get(grantHelper.getAllGrants)
 
-router.route('/grant/:grantId')
-    .get(grantHelper.getAGrant)
-    .delete(FBAuth.protect, grantHelper.deleteAGrant)
-    .post(FBAuth.protect, grantHelper.updateAGrant)
+router.route('/grant/:slug').get(grantHelper.getAGrant);
+
+router
+  .route('/grant/:grantId')
+  .delete(FBAuth.protect, grantHelper.deleteAGrant)
+  .post(FBAuth.protect, grantHelper.updateAGrant);
 
 router.route('/grant-applications/:grantId')
     .post(FBAuth.protect, grantHelper.submitGrantApplication)

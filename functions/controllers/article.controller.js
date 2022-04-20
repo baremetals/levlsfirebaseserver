@@ -15,6 +15,7 @@ exports.getAllArticles = (req, res) => {
           articleId: doc.id,
           title: doc.data().title,
           shortDescription: doc.data().shortDescription,
+          slug: doc.data().slug,
           content: doc.data().content,
           username: doc.data().username,
           userId: doc.data().userId,
@@ -27,7 +28,7 @@ exports.getAllArticles = (req, res) => {
           commentCount: doc.data().commentCount,
           isActive: doc.data().isActive,
           viewsCount: doc.data().viewsCount,
-          isPartner: doc.data().isPartner
+          isPartner: doc.data().isPartner,
         });
         
       });
@@ -65,9 +66,19 @@ exports.writeAnArticle = (req, res) => {
     if (req.body.customUrl.trim() === '') {
       return res.status(400).json({ customUrl: 'Url must not be empty' });
     }
+
+    const slug =
+      req.body.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
+
     const newArticle = {
       uploadUrl: req.body.customUrl,
       title: req.body.title,
+      slug,
       shortDescription: req.body.shortDescription,
       content: req.body.content,
       category: req.body.category,
@@ -81,7 +92,7 @@ exports.writeAnArticle = (req, res) => {
       contentType: 'article',
       isActive: false,
       viewsCount: 0,
-      isPartner: req.user.isPartner
+      isPartner: req.user.isPartner,
     };
 
     db.collection('articles')
@@ -152,9 +163,17 @@ exports.writeAnArticle = (req, res) => {
     });
 
     busboy.on("finish", () => {
+      const slug =
+        newArticle.title
+          .toLowerCase()
+          .replace(/[^\w ]+/g, '')
+          .replace(/ +/g, '-') +
+        '-' +
+        Date.parse(post_time_stamp);
       const uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/articles%2F${imageFileName}?alt=media&token=${generatedToken}`;
       newArticle.uploadUrl = uploadUrl;
       newArticle.userId = userId;
+      newArticle.slug = slug;
       newArticle.username = username;
       newArticle.contentType = 'article';
       newArticle.imageUrl = imageUrl;
@@ -189,15 +208,18 @@ exports.writeAnArticle = (req, res) => {
 // Fetch one article
 exports.getAnArticle = (req, res) => {
   let articleData = {};
-  db.doc(`/articles/${req.params.articleId}`)
+  db.collection('articles')
+    .where('slug', '==', req.params.slug)
     .get()
-    .then((doc) => {
-      if (!doc.exists) {
+    .then((data) => {
+      if (data.length === 0) {
         return res.status(404).json({ error: 'Article not found' });
       }
-      articleData = doc.data();
-      articleData.articleId = doc.id;
-      doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+      data.forEach((doc) => {
+        articleData = doc.data();
+        articleData.articleId = doc.id;
+        doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+      });
       return res.json(articleData);
     })
     .catch((err) => {

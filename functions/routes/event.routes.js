@@ -8,10 +8,12 @@ router.route('/events')
     .get(eventHelper.getAllEvents)
     .post(FBAuth.protect, eventHelper.createEvent)
 
-router.route('/event/:eventId')
-    .get(eventHelper.getEvent)
-    .delete(FBAuth.protect, eventHelper.deleteEvent)
-    .post(FBAuth.protect, eventHelper.updateEventDetails)
+router.route('/event/:slug').get(eventHelper.getEvent);
+
+router
+  .route('/event/:eventId')
+  .delete(FBAuth.protect, eventHelper.deleteEvent)
+  .post(FBAuth.protect, eventHelper.updateEventDetails);
 
 router.route('/event/:eventId/like')
     .get(FBAuth.protect, eventHelper.likeEvent)

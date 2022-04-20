@@ -14,6 +14,7 @@ exports.getAllPosts = (req, res) => {
           newsId: doc.id,
           title: doc.data().title,
           shortDescription: doc.data().shortDescription,
+          slug: doc.data().slug,
           content: doc.data().content,
           username: doc.data().username,
           imageUrl: doc.data().imageUrl,
@@ -50,6 +51,7 @@ exports.getAllOrgPosts = (req, res) => {
           newsId: doc.id,
           title: doc.data().title,
           shortDescription: doc.data().shortDescription,
+          slug: doc.data().slug,
           content: doc.data().content,
           username: doc.data().username,
           imageUrl: doc.data().imageUrl,
@@ -60,7 +62,7 @@ exports.getAllOrgPosts = (req, res) => {
           category: doc.data().category,
           likeCount: doc.data().likeCount,
           commentCount: doc.data().commentCount,
-          viewsCount: doc.data.viewsCount
+          viewsCount: doc.data.viewsCount,
         });
         
       });
@@ -83,7 +85,7 @@ exports.createPost = (req, res) => {
 
   let docId;
   let resArticle;
-
+  
   if (req.body.customUrl) {
     if (req.body.title.trim() === '') {
       return res.status(400).json({ error: 'Title must not be empty' });
@@ -97,10 +99,20 @@ exports.createPost = (req, res) => {
     if (req.body.customUrl.trim() === '') {
       return res.status(400).json({ error: 'Url must not be empty' });
     }
+
+    const slug =
+      req.body.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
+
     const newArticle = {
       uploadUrl: req.body.customUrl,
       title: req.body.title,
       shortDescription: req.body.shortDescription,
+      slug,
       content: req.body.content,
       category: req.body.category,
       createdAt: new Date().toISOString(),
@@ -182,10 +194,19 @@ exports.createPost = (req, res) => {
     });
 
     busboy.on("finish", () => {
+      const slug =
+        newArticle.title
+          .toLowerCase()
+          .replace(/[^\w ]+/g, '')
+          .replace(/ +/g, '-') +
+        '-' +
+        Date.parse(post_time_stamp);
+        
       const uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/news%2F${imageFileName}?alt=media&token=${generatedToken}`;
       newArticle.uploadUrl = uploadUrl;
       newArticle.userId = userId;
       newArticle.username = username;
+      newArticle.slug = slug;
       newArticle.contentType = 'news';
       newArticle.imageUrl = imageUrl;
       newArticle.createdAt = new Date().toISOString();
@@ -219,15 +240,18 @@ exports.createPost = (req, res) => {
 // Fetch one news post
 exports.getPost = (req, res) => {
   let newsData = {};
-  db.doc(`/news/${req.params.newsId}`)
+  db.collection('news')
+    .where('slug', '==', req.params.slug)
     .get()
-    .then((doc) => {
-      if (!doc.exists) {
+    .then((data) => {
+      if (data.length === 0) {
         return res.status(404).json({ error: 'Post not found' });
       }
-      newsData = doc.data();
-      newsData.newsId = doc.id;
-      doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+      data.forEach((doc) => {
+        newsData = doc.data();
+        newsData.newsId = doc.id;
+        doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+      });
       return res.json(newsData);
     })
     .catch((err) => {

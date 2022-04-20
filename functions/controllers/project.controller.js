@@ -13,6 +13,7 @@ exports.getAllProjects = (req, res) => {
         projects.push({
           projectId: doc.id,
           title: doc.data().title,
+          slug: doc.data().slug,
           start_date: doc.data().start_date,
           closing_date: doc.data().closing_date,
           category: doc.data().category,
@@ -28,7 +29,7 @@ exports.getAllProjects = (req, res) => {
           contentType: doc.data().contentType,
           isApplication: doc.data().isApplication,
           isActive: doc.data().isActive,
-          viewsCount: doc.data().viewsCount
+          viewsCount: doc.data().viewsCount,
         });
       });
       return res.json(projects);
@@ -50,10 +51,19 @@ exports.createProject = (req, res) => {
   let resProject;
 
   if (req.body.customUrl) {
+
+    const slug =
+      req.body.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
     const newProject = {
       uploadUrl: req.body.customUrl,
       title: req.body.title,
       description: req.body.description,
+      slug,
       category: req.body.category,
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
@@ -138,10 +148,18 @@ exports.createProject = (req, res) => {
     });
 
     busboy.on("finish", () => {
+      const slug =
+        newProject.title
+          .toLowerCase()
+          .replace(/[^\w ]+/g, '')
+          .replace(/ +/g, '-') +
+        '-' +
+        Date.parse(post_time_stamp);
       const uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/projects%2F${imageFileName}?alt=media&token=${generatedToken}`;
       newProject.uploadUrl = uploadUrl;
       newProject.userId = userId;
       newProject.username = username;
+      newProject.slug = slug;
       newProject.contentType = 'project';
       newProject.imageUrl = imageUrl;
       newProject.createdAt = new Date().toISOString();
@@ -175,15 +193,20 @@ exports.createProject = (req, res) => {
 // Fetch one project
 exports.getProject = (req, res) => {
   let projectData = {};
-  db.doc(`/projects/${req.params.projectId}`)
+
+  db.collection('projects')
+    .where('slug', '==', req.params.slug)
     .get()
-    .then((doc) => {
-      if (!doc.exists) {
+    .then((data) => {
+      if (data.length === 0) {
         return res.status(404).json({ error: 'Project not found' });
       }
-      projectData = doc.data();
-      projectData.projectId = doc.id;
-      doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+      data.forEach((doc) => {
+        projectData = doc.data();
+        projectData.projectId = doc.id;
+        doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+      });
+
       return res.json(projectData);
     })
     .catch((err) => {

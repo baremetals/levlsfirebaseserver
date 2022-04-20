@@ -15,19 +15,20 @@ exports.getAllGrants = (req, res) => {
           grantId: doc.id,
           title: doc.data().title,
           shortDescription: doc.data().shortDescription,
+          slug: doc.data().slug,
           content: doc.data().content,
           region: doc.data().region,
           location: doc.data().location,
           username: doc.data().username,
-          userId: req.user.userId,
-          imageUrl: req.user.imageUrl,
+          userId: doc.data().userId,
+          imageUrl: doc.data().imageUrl,
           createdAt: doc.data().createdAt,
           grantType: doc.data().grantType,
           closingDate: doc.data().closingDate,
           organisationName: doc.data().organisationName,
           applicationLink: doc.data().applicationLink,
           isActive: doc.data().isActive,
-          viewsCount: doc.data().viewsCount
+          viewsCount: doc.data().viewsCount,
         });
         
       });
@@ -59,11 +60,19 @@ exports.createAGrant = (req, res) => {
   if (req.user.userType !== "Organisation") {
     return res.status(400).json({ error: 'You are not permitted' });
   } else {
+    const slug =
+      req.body.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
 
     const newGrant = {
       title: req.body.title,
       shortDescription: req.body.shortDescription,
       content: req.body.content,
+      slug,
       category: req.body.category || "",
       grantType: req.body.grantType,
       location: req.body.location,
@@ -104,14 +113,20 @@ exports.createAGrant = (req, res) => {
 // Fetch one grant
 exports.getAGrant = (req, res) => {
   let grantData = {};
-  db.doc(`/grants/${req.params.grantId}`)
+
+  db.collection('grants')
+    .where('slug', '==', req.params.slug)
     .get()
-    .then((doc) => {
-      if (!doc.exists) {
+    .then((data) => {
+      if (data.length === 0) {
         return res.status(404).json({ error: 'Grant not found' });
       }
-      grantData = doc.data();
-      grantData.grantId = doc.id;
+
+      data.forEach((doc) => {
+        grantData = doc.data();
+        grantData.grantId = doc.id;
+      });
+
       return res.json(grantData);
     })
     .catch((err) => {

@@ -10,10 +10,12 @@ router.route('/internships')
 router.route('/internships/:userId')
     .get(internshipHelper.getAllInternships)
 
-router.route('/internship/:internshipId')
-    .get(internshipHelper.getAnInternship)
-    .delete(FBAuth.protect, internshipHelper.deleteAnInternship)
-    .post(FBAuth.protect, internshipHelper.updateAnInternship)
+router.route('/internship/:slug').get(internshipHelper.getAnInternship);
+
+router
+  .route('/internship/:internshipId')
+  .delete(FBAuth.protect, internshipHelper.deleteAnInternship)
+  .post(FBAuth.protect, internshipHelper.updateAnInternship);
 
 // router.route('/intern-applications/:internshipId')
 //     .post(FBAuth.protect, internshipHelper.submitInternApplication)

@@ -11,11 +11,12 @@ router
 router.route('/projects')
     .post(FBAuth.protect, postHelper.createProject)
 
+router.route('/project/:slug').get(postHelper.getProject)
+
 router
   .route('/project/:projectId')
-  .get(postHelper.getProject) // may need to relax this
   .delete(FBAuth.protect, postHelper.deleteProject)
-  .post(FBAuth.protect, postHelper.updateProjectDetails);
+  .post(FBAuth.protect, postHelper.updateProjectDetails)
 
 router.route('/project/:projectId/like')
     .get(FBAuth.protect, postHelper.likeProject)

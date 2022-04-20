@@ -12,6 +12,7 @@ exports.getAllEvents = (req, res) => {
         events.push({
           eventId: doc.id,
           title: doc.data().title,
+          slug: doc.data().slug,
           host: doc.data().host,
           start_date: doc.data().start_date,
           endDate: doc.data().endDate,
@@ -30,7 +31,7 @@ exports.getAllEvents = (req, res) => {
           username: doc.data().username,
           userId: doc.data().userId,
           viewsCount: doc.data().viewsCount,
-          isPartner: doc.data().isPartner
+          isPartner: doc.data().isPartner,
         });
       });
       return res.json(events);
@@ -59,7 +60,7 @@ exports.createEvent = (req, res) => {
   let imageFileName;
   let generatedToken = uuidv4();
   let newEvent = {};
-
+  
 
   busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
     // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
@@ -101,10 +102,18 @@ exports.createEvent = (req, res) => {
   });
 
   busboy.on("finish", () => {
+    const slug =
+      newEvent.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
     const eventMediaUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/events%2F${imageFileName}?alt=media&token=${generatedToken}`;
     newEvent.eventMediaUrl = eventMediaUrl;
     newEvent.userId = userId;
     newEvent.username = username;
+    newEvent.slug = slug;
     newEvent.contentType = 'event';
     newEvent.imageUrl = imageUrl;
     newEvent.createdAt = new Date().toISOString();
@@ -137,15 +146,20 @@ exports.createEvent = (req, res) => {
 // Fetch one event
 exports.getEvent = (req, res) => {
   let eventData = {};
-  db.doc(`/events/${req.params.eventId}`)
+  db.collection('events')
+    .where('slug', '==', req.params.slug)
     .get()
-    .then((doc) => {
-      if (!doc.exists) {
+    .then((data) => {
+      if (data.length === 0) {
         return res.status(404).json({ error: 'Event not found' });
       }
-      eventData = doc.data();
-      eventData.eventId = doc.id;
-      doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+
+      data.forEach((doc) => {
+        eventData = doc.data();
+        eventData.eventId = doc.id;
+        doc.ref.update({ viewsCount: doc.data().viewsCount + 1 });
+      });
+      
       return res.json(eventData);
     })
     .catch((err) => {

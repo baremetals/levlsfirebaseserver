@@ -11,10 +11,12 @@ router.route('/newsposts')
 router.route('/newsposts/:userId')
     .get(postHelper.getAllOrgPosts)
 
-router.route('/newspost/:newsId')
-    .get(postHelper.getPost)
-    .delete(FBAuth.protect, postHelper.deletePost)
-    .post(FBAuth.protect, postHelper.updatePost)
+router.route('/newspost/:slug').get(postHelper.getPost);
+
+router
+  .route('/newspost/:newsId')
+  .delete(FBAuth.protect, postHelper.deletePost)
+  .post(FBAuth.protect, postHelper.updatePost);
 
 router.route('/newspost/:newsId/like')
     .get(FBAuth.protect, postHelper.likePost)
