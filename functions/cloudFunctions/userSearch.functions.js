@@ -11,7 +11,7 @@ const ALGOLIA_INDEX_NAME = 'users';
 exports.addToIndex = functions
 .region('europe-west2')
 .firestore.document('users/{id}')
-.onCreate((snap, context) => {
+.onCreate((snap, _context) => {
   const user = {
     userId: snap.data().userId, 
     imageUrl: snap.data().imageUrl,
@@ -30,6 +30,7 @@ exports.updateIndex = functions
 .firestore.document('users/{id}')
 .onUpdate((change) => {
   const newData = change.after.data();
+  newData.objectID = newData.userId;
   const index = client.initIndex(ALGOLIA_INDEX_NAME);
   return index.saveObject(newData);
 })
@@ -46,7 +47,7 @@ exports.deleteIndex = functions
 exports.addToOpportunitiesIndex = functions
 .region('europe-west2')
 .firestore.document('opportunities/{id}')
-.onCreate((snap, context) => {
+.onCreate((snap, _context) => {
   const data = snap.data()
   data.objectID = snap.id;
   data.createdAtAsTimestamp = Date.parse(data.createdAt)
@@ -57,11 +58,11 @@ exports.addToOpportunitiesIndex = functions
 exports.updateOpportunitiesIndex = functions
 .region('europe-west2')
 .firestore.document('opportunities/{id}')
-.onUpdate((change, snap) => {
-  const newData = change.after.data();
-  newData.objectID = snap.id;
-  newData.createdAtAsTimestamp = Date.parse(newData.createdAt)
+.onUpdate((change, _snap) => {
   const index = client.initIndex('opportunities');
+  const newData = change.after.data();
+  newData.objectID = newData.opportunityId;
+  newData.createdAtAsTimestamp = Date.parse(newData.createdAt)
   return index.saveObject(newData);
 })
 
@@ -77,7 +78,7 @@ exports.deleteOpportunitiesIndex = functions
 exports.addToEventsIndex = functions
 .region('europe-west2')
 .firestore.document('events/{id}')
-.onCreate((snap, context) => {
+.onCreate((snap, _context) => {
   const data = snap.data()
   data.objectID = snap.id;
   data.createdAtAsTimestamp = Date.parse(data.createdAt)
@@ -91,6 +92,7 @@ exports.updateEventsIndex = functions
 .onUpdate((change) => {
   const newData = change.after.data();
   const index = client.initIndex('events');
+  newData.objectID = newData.eventId;
   return index.saveObject(newData);
 })
 
@@ -106,7 +108,7 @@ exports.deleteEventsIndex = functions
 exports.addToResourcesIndex = functions
 .region('europe-west2')
 .firestore.document('resources/{id}')
-.onCreate((snap, context) => {
+.onCreate((snap, _context) => {
   const data = snap.data()
   data.objectID = snap.id;
   data.createdAtAsTimestamp = Date.parse(data.createdAt)
@@ -120,6 +122,7 @@ exports.updateResourcesIndex = functions
 .onUpdate((change) => {
   const newData = change.after.data();
   const index = client.initIndex('resources');
+  newData.objectID = newData.resourceId;
   return index.saveObject(newData);
 })
 
@@ -135,7 +138,7 @@ exports.deleteResourcesIndex = functions
 exports.addToCompaniesIndex = functions
 .region('europe-west2')
 .firestore.document('companies/{id}')
-.onCreate((snap, context) => {
+.onCreate((snap, _context) => {
   const data = snap.data()
   data.objectID = snap.id;
   const index = client.initIndex('companies');
@@ -148,6 +151,7 @@ exports.updateCompaniesIndex = functions
 .onUpdate((change) => {
   const newData = change.after.data();
   const index = client.initIndex('companies');
+  newData.objectID = newData.companyId;
   return index.saveObject(newData);
 })
 
@@ -163,7 +167,7 @@ exports.deleteCompanyFromIndex = functions
 exports.addToSkillsIndex = functions
 .region('europe-west2')
 .firestore.document('skills/{id}')
-.onCreate((snap, context) => {
+.onCreate((snap, _context) => {
   const data = snap.data()
   data.objectID = snap.id;
   const index = client.initIndex('skills');
@@ -176,6 +180,7 @@ exports.updateSkillsIndex = functions
 .onUpdate((change) => {
   const newData = change.after.data();
   const index = client.initIndex('skills');
+  newData.objectID = newData.skillId;
   return index.saveObject(newData);
 })
 

@@ -44,9 +44,12 @@ exports.refreshToken = (req, res) => {
 
 // Sign users up
 exports.signup = (req, res) => {
+  let usageTotalRef;
   const increment = admin.firestore.FieldValue.increment(1);
   const inActiveUsersRef = db.collection("site stats").doc("inactive-users")
   const totalUsersRef = db.collection("site stats").doc("all-users")
+  if (req.body.signUpCode !== '')
+    usageTotalRef = db.collection('codes').doc(req.body.signUpCode);
   const batch = db.batch();
 
   const adminMsg = {
@@ -67,9 +70,10 @@ exports.signup = (req, res) => {
     dateOfBirth: req.body.dateOfBirth,
     email: req.body.email,
     password: req.body.password,
-    confirmPassword: req.body.confirmPassword, 
-    userType: req.body.userType || "Personal",
-    deviceToken: req.body.deviceToken || ""
+    confirmPassword: req.body.confirmPassword,
+    userType: req.body.userType || 'Personal',
+    deviceToken: req.body.deviceToken || '',
+    signUpCode: req.body.signUpCode || '',
   };
 
   const { valid, errors } = validateSignupData(newUser);
@@ -130,6 +134,7 @@ exports.signup = (req, res) => {
         twitter: '',
         linkedIn: '',
         profileUrl: '',
+        signUpCode: newUser.signUpCode,
       };
       db.doc(`/users/${userId}`).set(userCredentials);
       return db.collection('usernames').doc(`${newUser.username}`).get();
@@ -172,6 +177,8 @@ exports.signup = (req, res) => {
     .then(() => {
       batch.set(totalUsersRef, { totalCount: increment }, { merge: true });
       batch.set(inActiveUsersRef, { totalCount: increment }, { merge: true });
+      if (req.body.signUpCode !== '')
+        batch.set(usageTotalRef, { usageTotal: increment }, { merge: true });
       batch.commit();
     })
     .then( async () => {
