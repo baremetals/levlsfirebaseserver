@@ -1,6 +1,6 @@
 const { admin, db } = require("../utils/admin");
 const config = require("../utils/database");
-const { uuidv4 } = require('uuid');
+const { uuid } = require('uuidv4');
 
 
 
@@ -279,7 +279,7 @@ exports.userUploads = (req, res) => {
 
     let contentToBeUploaded = {};
     let uploadFileName;
-    let generatedToken = uuidv4();
+    let generatedToken = uuid();
     let newUpload = {};
 
 
@@ -307,7 +307,6 @@ exports.userUploads = (req, res) => {
   busboy.on("finish", async () => {
     let promise;
     uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/uploads%2F${uploadFileName}?alt=media&token=${generatedToken}`;
-
       promise = admin
       .storage()
       .bucket(config.storageBucket)

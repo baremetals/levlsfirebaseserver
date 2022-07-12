@@ -66,7 +66,7 @@ exports.submitGrantApplication = (req, res) => {
   
       let imagesToBeUploaded = [];
       let imageFileName = {};
-      let generatedToken = uuidv4();
+      let generatedToken = uuid();
       let imageToAdd = {}
       let uploadUrls = [];
       let newAppilcation = {};

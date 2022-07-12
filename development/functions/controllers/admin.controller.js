@@ -1,7 +1,7 @@
 const { admin, db } = require("../utils/admin");
 const sgMail = require('@sendgrid/mail')
 const config = require("../utils/database");
-const { v4: uuidv4 } = require('uuid');
+const { uuid } = require('uuidv4');;
 
 
 const firebase = require("firebase");
@@ -570,7 +570,7 @@ exports.adminCreateResource = (req, res) => {
 
     let imageToBeUploaded = {};
     let imageFileName;
-    let generatedToken = uuidv4();
+    let generatedToken = uuid();
     let newResource = {};
 
     busboy.on(
@@ -693,7 +693,7 @@ exports.adminCreateEvent = (req, res) => {
 
   let imageToBeUploaded = {};
   let imageFileName;
-  let generatedToken = uuidv4();
+  let generatedToken = uuid();
   let newEvent = {};
 
   busboy.on(
@@ -874,7 +874,7 @@ exports.adminCreateNewsPost = (req, res) => {
 
     let imageToBeUploaded = {};
     let imageFileName;
-    let generatedToken = uuidv4();
+    let generatedToken = uuid();
     let newArticle = {};
 
     busboy.on(

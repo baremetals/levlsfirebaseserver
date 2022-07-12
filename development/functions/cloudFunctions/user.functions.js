@@ -1,20 +1,23 @@
 const functions = require("firebase-functions");
 const { db, admin } = require('../utils/admin');
 const sgMail = require('@sendgrid/mail')
+const config = require('../utils/database');
+const { addToSendgrid } = require('../lib');
+var request = require('request');
+
 
 exports.verifyEmail = functions
   .region('europe-west2')
-  .firestore.document('users/{userId}')
-  .onCreate( async (snap, _ctx) => {
-    const data = snap.data()
+  .auth.user()
+  .onCreate(async (user) => {
     const msg = {
-      to: `${data.email}`, // recipient
+      to: `${user.email}`, // recipient
       from: 'LEVLS. <noreply@levls.io>', // Change to verified sender
       template_id: 'd-558f2d5a214649c7bcccc1f2e30df393',
       dynamic_template_data: {
         subject: 'Thanks for signing up',
-        username: data.username,
-        url: `https://levls.io/signup/${data.userId}`,
+        username: user.displayName,
+        url: `http://localhost:3000/signup/${user.uid}`,
         buttonText: 'Verify email now',
       },
     };
@@ -22,19 +25,77 @@ exports.verifyEmail = functions
     await sgMail
       .send(msg)
       .then(() => {
-        console.log('Email sent')
-        return db.doc(`/notifications/${data.username}`).set({
+        console.log('Email sent');
+        return db.doc(`/notifications/${user.displayName}`).set({
           createdAt: new Date().toISOString(),
-          recipient: data.userId,
-          message: `Thank you for registering ${data.username}.`,
+          recipient: user.uid,
+          message: `Thank you for registering ${user.displayName}.`,
           type: 'Verify email',
           read: false,
-        })
+        });
       })
       .catch((error) => {
-        console.error(error)
-      })
-})
+        console.log(`Sending the verify email produced this error: ${error}`);
+      });
+  });
+
+exports.addUserToSendgrid = functions
+  .region('europe-west2')
+  .firestore.document('users/{userId}')
+  .onCreate(async (snap, _ctx) => {
+    const user = snap.data();
+    if (user.userType === 'Personal') {
+      const data = {
+        list_ids: ['e5ad3bb1-b361-47de-9fa3-a900234ed6f0'],
+        contacts: [
+          {
+            email: user.email,
+            first_name: user.firstName,
+            last_name: user.lastName,
+            unique_name: user.username,
+            custom_fields: {
+              e8_T: 'www.waveytests.com',
+              // mobile: '9.5',
+              // username: 'machine gun kelly',
+              // fullname: 'Fucking Legends',
+            },
+          },
+        ],
+      };
+      try {
+        const response = await addToSendgrid(data);
+        console.log(response)
+      } catch(err) {
+        console.log(err)
+      }
+      
+    } else {
+      const data = {
+        list_ids: ['e5ad3bb1-b361-47de-9fa3-a900234ed6f0'],
+        contacts: [
+          {
+            email: user.email,
+            first_name: user.firstName,
+            last_name: user.lastName,
+            unique_name: user.username,
+            custom_fields: {
+              e8_T: 'www.waveytests.com',
+              // mobile: '9.5',
+              // username: 'machine gun kelly',
+              // fullname: 'Fucking Legends',
+            },
+          },
+        ],
+      };
+      try {
+        const response = await addToSendgrid(data);
+        console.log(response);
+      } catch (err) {
+        console.log(err);
+      }
+    }
+    
+  });
 
 exports.welcomeEmail = functions
   .region('europe-west2')
@@ -73,7 +134,7 @@ exports.welcomeEmail = functions
         return batch.commit();
       })
       .catch((error) => {
-        console.error(error)
+        console.log(`Sending the welcome mail produced this error: ${error}`);
       })
     } else return null;
     
@@ -304,7 +365,7 @@ exports.createNotificationForNewfollower = functions
 exports.deleteNotificationOnUnfollow = functions
   .region('europe-west2')
   .firestore.document('followers/{id}')
-  .onDelete((snapshot, context) => {
+  .onDelete(async(snapshot, _context) => {
     return db
       .doc(`/notifications/${snapshot.id}`)
       .delete()
@@ -577,7 +638,7 @@ exports.onUserDataChange = functions
 exports.onDeleteUser = functions
   .region('europe-west2')
   .firestore.document('/users/{userId}')
-  .onDelete((snap, context) => {
+  .onDelete((snap, _context) => {
     const data = snap.data()
     const decrement = admin.firestore.FieldValue.increment(-1);
     const activeUsersRef = db.collection("site stats").doc("active-users")

@@ -14,6 +14,7 @@ const {
   // may need to relax this
   getAllUsers,
   resetPassword,
+  forgotPassword,
   updatePassword,
   updateEmailAdd,
   getAllUsernames,
@@ -84,6 +85,8 @@ router.route('/users')
 
 router.route('/user-following')
   .get(FBAuth.protect, getLoggedInUserFollowingList)
+
+router.route('/forgot-password').post(forgotPassword);
 
 router.route('/reset-password')
   .post(resetPassword)

@@ -222,32 +222,50 @@ exports.updateSkills = (req, res) => {
 };
 
 // Interests
+exports.addInterestsOld = (req, res) => {
+  if (req.body.interestList === [])
+    return res.status(400).json({ interestList: 'Must not be empty' });
+
+  const newInterest = {
+    interestList: req.body.interestList,
+    otherInterestList: req.body.otherInterestList,
+    createdAt: new Date().toISOString(),
+    username: req.user.username,
+    userId: req.user.userId,
+    userImage: req.user.imageUrl,
+  };
+
+  db.collection(`users/${req.user.userId}/interests`)
+    .add(newInterest)
+    .then((doc) => {
+      const resInterest = newInterest;
+      resInterest.interestId = doc.id;
+      res.json(resInterest);
+    })
+    .catch((err) => {
+      console.log(err);
+      res.status(500).json({ error: 'Something went wrong' });
+    });
+};
+
 exports.addInterests = (req, res) => {
-    if (req.body.interestList === [])
-      return res.status(400).json({ interestList: 'Must not be empty' });
-    
-    const newInterest = {
-      interestList: req.body.interestList,
-      otherInterestList: req.body.otherInterestList,
-      createdAt: new Date().toISOString(),
-      username: req.user.username,
-      userId: req.user.userId,
-      userImage: req.user.imageUrl 
-    };
-  
-    db.collection(`users/${req.user.userId}/interests`)
-      .add(newInterest)
-      .then((doc) => {
-        const resInterest = newInterest;
-        resInterest.interestId = doc.id;
-        res.json(resInterest);
-      })
-      .catch((err) => {
-        console.log(err);
-        res.status(500).json({ error: 'Something went wrong' });
-      });
-  
-}
+  const interests = req.body.interestList;
+
+  db.doc(`users/${req.user.userId}`)
+    .update({ interests })
+    .then(() => {
+       return res.json({
+         message: 'Interests updated successfully',
+         interests,
+       });
+    })
+    .catch((err) => {
+      console.log(err);
+      res
+        .status(500)
+        .json({ error: 'Something went wrong  please try again later' });
+    });
+};
 
 exports.deleteInterest = (req, res) => {
     const interestDoc = db.doc(`users/${req.user.userId}/interests/${req.params.interestId}`);
@@ -271,7 +289,7 @@ exports.deleteInterest = (req, res) => {
 
 exports.updateInterest = (req, res) => {
     let interestDetails = req.body;
-    db.doc(`users/${req.user.userId}/interests/${req.params.interestId}`)
+    db.doc(`users/${req.user.userId}`)
       .update(interestDetails)
       .then(() => {
         // if (!doc.exists) {
@@ -283,4 +301,23 @@ exports.updateInterest = (req, res) => {
         console.error(err);
         return res.status(500).json({ error: err.code });
       });
+};
+
+// preferred Industries
+
+exports.addPreferredIndustries = (req, res) => {
+  const preferredIndustries = req.body.industriesList;
+
+  db.doc(`users/${req.user.userId}`)
+    .update({ preferredIndustries })
+    .then(() => {
+      return res.json({
+        message: 'preferred industries updated successfully',
+        preferredIndustries,
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+      res.status(500).json({ error: 'Something went wrong, please try again later'});
+    });
 };

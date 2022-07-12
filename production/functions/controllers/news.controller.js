@@ -1,6 +1,6 @@
 const { admin, db } = require('../utils/admin');
 const config = require("../utils/database");
-const { v4: uuidv4 } = require('uuid');
+const { uuid } = require('uuidv4');
 const sgMail = require('@sendgrid/mail');
 
 // Fetch all news post
@@ -172,7 +172,7 @@ exports.createPost = (req, res) => {
 
     let imageToBeUploaded = {};
     let imageFileName;
-    let generatedToken = uuidv4();
+    let generatedToken = uuid();
     let newArticle = {};
 
     const adminMsg = {

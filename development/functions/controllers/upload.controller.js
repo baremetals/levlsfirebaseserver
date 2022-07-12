@@ -1,6 +1,6 @@
 const { admin, db } = require("../utils/admin");
 const config = require("../utils/database");
-const { uuidv4 } = require('uuid');
+const { uuid } = require('uuidv4');
 
 
 
@@ -279,9 +279,8 @@ exports.userUploads = (req, res) => {
 
     let contentToBeUploaded = {};
     let uploadFileName;
-    let generatedToken = uuidv4();
+    let generatedToken = uuid();
     let newUpload = {};
-
 
     busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
       newUpload[fieldname] = val
@@ -307,7 +306,6 @@ exports.userUploads = (req, res) => {
   busboy.on("finish", async () => {
     let promise;
     uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/uploads%2F${uploadFileName}?alt=media&token=${generatedToken}`;
-
       promise = admin
       .storage()
       .bucket(config.storageBucket)
@@ -325,7 +323,6 @@ exports.userUploads = (req, res) => {
 
     try {
       await Promise.resolve(promise);
-
       newUpload.uploadUrl = uploadUrl;
       newUpload.createdAt = new Date().toISOString();
       newUpload.post_time_stamp = Date.parse(post_time_stamp)
@@ -368,12 +365,12 @@ exports.updateUploadDetails = (req, res) => {
 
   uploadDocument
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Upload not found' });
       }
-      uploadDocument.update(uploadDetails)
-      return db.doc(`/mobile timeline/${req.params.uploadId}`).update(uploadDetails);
+      await uploadDocument.update(uploadDetails)
+      await db.doc(`/mobile timeline/${req.params.uploadId}`).update(uploadDetails);
       
     })
     .then(() => {
@@ -381,7 +378,10 @@ exports.updateUploadDetails = (req, res) => {
     })
     .catch((err) => {
       console.error(err);
-      return res.status(500).json({ error: err.code });
+      return res.status(500).json({
+        error: 'Sorry the server is having a small issue',
+      });
+      // res.status(500).json({ error: err.code });
     });
 };
 

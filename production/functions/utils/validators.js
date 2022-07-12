@@ -27,11 +27,56 @@ exports.validateSignupData = (data) => {
       errors.error = 'Username must only contain letters, numbers, hyphens or an underscore(a-z0-9/_)';
     
     // if (data.dateOfBirth.trim() === '') errors.dateOfBirth = 'Please your date of birth';
+    if (data.firstName.trim() === '')
+      errors.error = 'Please enter a first name';
+    if (data.firstName.trim().length <= 2)
+      errors.error = 'Your first name must have 2 characters or more.';
+    if (data.lastName.trim() === '') errors.error = 'Please enter a last name';
+    if (data.lastName.trim().length <= 2)
+      errors.error = 'Your last name must have 2 characters or more.';
   
     return {
       errors,
       valid: Object.keys(errors).length === 0 ? true : false
     };
+};
+
+exports.validateOrgSignupData = (data) => {
+  let errors = {};
+  let regex = /^[a-zA-Z0-9\d-_]*$/;
+
+  if (data.email.trim() === '') {
+    errors.error = 'Please enter an email address.';
+  }
+  if (!validator.isEmail(data.email)) {
+    errors.error = 'You must provide a valid email address.';
+  }
+
+  if (data.password.trim() === '')
+    errors.error = 'Please enter a suitable password.';
+  if (data.password.trim().length <= 5)
+    errors.error = 'Your password must have 6 characters or more.';
+  if (data.password.trim() !== data.confirmPassword)
+    errors.error = 'Passwords must match!';
+
+  if (data.username.trim() === '') errors.error = 'Please enter a username';
+  if (data.username.trim().length <= 3)
+    errors.error = 'Your username must have 4 characters or more.';
+  if (data.username.trim().length > 15)
+    errors.error = 'Your username must have a maximum of 15 characters.';
+  if (regex.test(data.username.trim()) !== true)
+    errors.error =
+      'Username must only contain letters, numbers, hyphens or an underscore(a-z0-9/_)';
+
+  // if (data.dateOfBirth.trim() === '') errors.dateOfBirth = 'Please your date of birth';
+  if (data.fullname.trim() === '') errors.error = 'Please enter your full name';
+  if (data.fullname.trim().length <= 2)
+    errors.error = 'Your full name must have 2 characters or more.';
+
+  return {
+    errors,
+    valid: Object.keys(errors).length === 0 ? true : false,
+  };
 };
   
 exports.validateLoginData = (data) => {
@@ -84,7 +129,9 @@ exports.reduceUserDetails = (data) => {
         userDetails.website = `http://${data.website.trim()}`;
       } else userDetails.website = data.website;
     }
-    if (data.fullname.trim() !== '') userDetails.fullname = data.fullname;
+    if (data.firstName.trim() !== '') userDetails.firstName = data.firstName;
+    if (data.lastName.trim() !== '') userDetails.lastName = data.lastName;
+    userDetails.fullname = data.firstName + ' ' + data.lastName;
     if (data.occupation.trim() !== '') userDetails.occupation = data.occupation;
     if (data.mobile.trim() !== '') userDetails.mobile = data.mobile;
     if (data.gender.trim() !== '') userDetails.gender = data.gender;

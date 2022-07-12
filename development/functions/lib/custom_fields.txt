@@ -1,0 +1,86 @@
+{
+  id: 'e1_T',
+  name: 'fullname',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e1_T'
+  }
+}
+
+{
+  id: 'e2_T',
+  name: 'organisation_name',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e2_T'
+  }
+}
+
+{
+  id: 'e3_T',
+  name: 'organisation_type',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e3_T'
+  }
+}
+
+{
+  id: 'e4_T',
+  name: 'username',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e4_T'
+  }
+}
+{
+  id: 'e5_T',
+  name: 'mobile',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e5_T'
+  }
+}
+{
+  id: 'e6_T',
+  name: 'createdAt',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e6_T'
+  }
+}
+{
+  id: 'e7_T',
+  name: 'industry',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e7_T'
+  }
+}
+
+{
+  id: 'e8_T',
+  name: 'website',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e8_T'
+  }
+}
+
+{
+  id: 'e9_T',
+  name: 'referral',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e9_T'
+  }
+}
+
+{
+  id: 'e10_T',
+  name: 'gender',
+  field_type: 'Text',
+  _metadata: {
+    self: 'https://api.sendgrid.com/v3/marketing/field_definitions/e10_T'
+  }
+}

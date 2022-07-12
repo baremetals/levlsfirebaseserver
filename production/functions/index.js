@@ -2,6 +2,7 @@ const functions = require("firebase-functions");
 const app = require('express')();
 const adminRoutes = require('./routes/admin.routes')
 const userRoutes = require('./routes/user.routes')
+const orgRoutes = require('./routes/organisation.routes')
 const uploadRoutes = require('./routes/upload.routes')
 const eventRoutes = require('./routes/event.routes')
 const projectRoutes = require('./routes/project.routes')
@@ -21,6 +22,7 @@ app.use(cors());
 
 app.use('/', adminRoutes)
 app.use('/', userRoutes)
+app.use('/', orgRoutes)
 app.use('/', projectRoutes)
 app.use('/', uploadRoutes)
 app.use('/', eventRoutes)

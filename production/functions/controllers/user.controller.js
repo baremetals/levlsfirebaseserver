@@ -1,12 +1,9 @@
-const { admin, db } = require("../utils/admin");
+const { admin, db, firebase, defaultAuth, dayjs } = require('../utils/admin');
 const config = require("../utils/database");
-const { v4: uuidv4 } = require('uuid');
+const { uuid } = require('uuidv4');
 const sgMail = require('@sendgrid/mail')
 var request = require('request');
 
-
-const firebase = require("firebase");
-firebase.initializeApp(config);
 
 const {
   validateSignupData,
@@ -46,8 +43,8 @@ exports.refreshToken = (req, res) => {
 exports.signup = (req, res) => {
   let usageTotalRef;
   const increment = admin.firestore.FieldValue.increment(1);
-  const inActiveUsersRef = db.collection("site stats").doc("inactive-users")
-  const totalUsersRef = db.collection("site stats").doc("all-users")
+  const inActiveUsersRef = db.collection('site stats').doc('inactive-users');
+  const totalUsersRef = db.collection('site stats').doc('all-users');
   if (req.body.signUpCode !== '')
     usageTotalRef = db.collection('codes').doc(req.body.signUpCode);
   const batch = db.batch();
@@ -66,6 +63,8 @@ exports.signup = (req, res) => {
   };
 
   const newUser = {
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
     username: req.body.username,
     dateOfBirth: req.body.dateOfBirth,
     email: req.body.email,
@@ -77,128 +76,152 @@ exports.signup = (req, res) => {
   };
 
   const { valid, errors } = validateSignupData(newUser);
-  const noImg = "default.jpg";
-  const bkgImage = "background.jpg";
+  const noImg = 'default.jpg';
+  const bkgImage = 'background.jpg';
   let userId, uid;
-  
+
   if (!valid) {
     return res.status(400).json(errors);
   } else {
-    firebase
-    .auth()
-    .createUserWithEmailAndPassword(newUser.email, newUser.password)
-    .then((data) => {
-      userId = data.user.uid;
-      uid = data.user.uid;
-      return data.user.getIdToken();
-    })
-    .then(() => {
-      const userCredentials = {
-        createdAt: new Date().toISOString(),
-        fullname: '',
-        Pronouns: '',
-        organisationName: '',
-        username: newUser.username,
-        occupation: '',
-        dateOfbirth: newUser.dateOfBirth,
-        email: newUser.email,
-        mobile: '',
-        gender: '',
-        imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
-        backgroundImage: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${bkgImage}?alt=media&token=${config.defaultbkimgtoken}`,
-        userId,
-        bio: '',
-        CV: '',
-        website: '',
-        slogan: '',
-        founded: '',
-        industry: '',
-        companySize: '',
-        organisationType: '',
-        numberOrname: '',
-        street: '',
-        city: 'London',
-        country: 'England',
-        postcode: '',
-        followersCount: 0,
-        followingCount: 0,
-        userType: newUser.userType,
-        isAdmin: false,
-        verified: false,
-        acceptedTerms: true,
-        isActive: false,
-        isPartner: false,
-        deviceToken: newUser.deviceToken,
-        instagram: '',
-        tiktok: '',
-        twitter: '',
-        linkedIn: '',
-        profileUrl: '',
-        signUpCode: newUser.signUpCode,
-      };
-      db.doc(`/users/${userId}`).set(userCredentials);
-      return db.collection('usernames').doc(`${newUser.username}`).get();
-    })
-    .then((doc) => {
-      if (doc.exists) {
-        return res.status(400).json({ error: "username is already taken" });
-      } else {
-        return db.collection('usernames').doc(`${newUser.username}`).set({
-          uid,
-          createdAt: new Date().toISOString(),
-          imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
-          fullname: '',
-          organisationName: '',
-          isActive: false,
+    db.collection('usernames')
+      .doc(`${newUser.username}`)
+      .get()
+      .then((doc) => {
+        if (doc.exists) {
+          return res.status(400).json({ error: 'username is already in use' });
+        }
+        defaultAuth
+          .createUser({
+            email: newUser.email,
+            emailVerified: false,
+            password: newUser.password,
+            displayName: newUser.username,
+            disabled: false,
+          })
+          .then((userRecord) => {
+            userId = userRecord.uid;
+            uid = userRecord.uid;
+          })
+          .then(async () => {
+            const userCredentials = {
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              firstName: newUser.firstName,
+              lastName: newUser.lastName,
+              fullname: newUser.firstName + ' ' + newUser.lastName,
+              Pronouns: '',
+              username: newUser.username,
+              occupation: '',
+              dateOfbirth: newUser.dateOfBirth,
+              email: newUser.email,
+              mobile: '',
+              gender: '',
+              imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
+              backgroundImage: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${bkgImage}?alt=media&token=${config.defaultbkimgtoken}`,
+              userId,
+              bio: '',
+              CV: '',
+              website: '',
+              slogan: '',
+              numberOrname: '',
+              street: '',
+              city: 'London',
+              country: 'England',
+              postcode: '',
+              followersCount: 0,
+              followingCount: 0,
+              userType: newUser.userType,
+              verified: false,
+              acceptedTerms: true,
+              isActive: false,
+              deviceToken: newUser.deviceToken,
+              instagram: '',
+              tiktok: '',
+              twitter: '',
+              linkedIn: '',
+              profileUrl: '',
+              signUpCode: newUser.signUpCode,
+            };
+            await db.doc(`/users/${userId}`).set(userCredentials);
+            return db
+              .collection('usernames')
+              .doc(`${newUser.username}`)
+              .set({
+                uid,
+                createdAt: new Date().toISOString(),
+                imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
+                fullname: '',
+                isActive: false,
+              })
+              .then(() => {
+                const userExperience = {};
+                db.collection(`users/${userId}/experiences`).add(
+                  userExperience
+                );
+              })
+              .then(() => {
+                const userEducation = {};
+                db.collection(`users/${userId}/educations`).add(userEducation);
+              })
+              .then(() => {
+                const userSkills = {};
+                db.collection(`users/${userId}/skills`).add(userSkills);
+              })
+              .then(() => {
+                const userInterests = {};
+                db.collection(`users/${userId}/interests`).add(userInterests);
+                //
+              })
+              .then(() => {
+                batch.set(
+                  totalUsersRef,
+                  { totalCount: increment },
+                  { merge: true }
+                );
+                batch.set(
+                  inActiveUsersRef,
+                  { totalCount: increment },
+                  { merge: true }
+                );
+                if (req.body.signUpCode !== '')
+                  batch.set(
+                    usageTotalRef,
+                    { usageTotal: increment },
+                    { merge: true }
+                  );
+                batch.commit();
+              })
+              .then(async () => {
+                await sgMail.send(adminMsg);
+                return res
+                  .status(201)
+                  .json({ success: 'Your user account has been created.' });
+              })
+              .catch((err) => {
+                console.error(err);
+                return res.status(500).json({
+                  error: 'The server is out for lunch, please try again later.',
+                });
+              });
+          })
+          .catch((err) => {
+            console.error(err);
+            if (err.code === 'auth/email-already-exists') {
+              return res.status(400).json({ error: 'Email is already in use' });
+            } else {
+              return res.status(500).json({
+                error: 'The server is out for lunch, please try again later.',
+              });
+            }
+          });
+      })
+      .catch((err) => {
+        console.error(err);
+        return res.status(500).json({
+          error: 'The server is out for lunch, please try again later.',
         });
-      }
-    })
-    .then(() => {
-      const userExperience = {
-      }
-      db.collection(`users/${userId}/experiences`).add(userExperience);
-    })
-    .then(() => {
-      const userEducation = {
-      }
-      db.collection(`users/${userId}/educations`).add(userEducation);
-    })
-    .then(() => {
-      const userSkills = {
-      }
-      db.collection(`users/${userId}/skills`).add(userSkills);
-    })
-    .then(() => {
-      const userInterests = {
-      }
-      db.collection(`users/${userId}/interests`).add(userInterests);
-      // 
-    })
-    .then(() => {
-      batch.set(totalUsersRef, { totalCount: increment }, { merge: true });
-      batch.set(inActiveUsersRef, { totalCount: increment }, { merge: true });
-      if (req.body.signUpCode !== '')
-        batch.set(usageTotalRef, { usageTotal: increment }, { merge: true });
-      batch.commit();
-    })
-    .then( async () => {
-      await sgMail.send(adminMsg)
-      return res.status(201).json({ success: "Your user account has been created." });
-    })
-    .catch((err) => {
-      console.error(err);
-      if (err.code === "auth/email-already-in-use") {
-        return res.status(400).json({ error: "Email is already in use" });
-      } else {
-        return res
-          .status(500)
-          .json({ error: "The server is out for lunch, please try again later." });
-      }
-    });
-    
+      });
   }
-
-  
 };
 
 // Create a unique username
@@ -308,7 +331,7 @@ exports.signin = (req, res) => {
     })
     .then(() => {
       if (userDoc.verified !== true) {
-        console.log(userDoc.verified)
+        // console.log(userDoc.verified)
         return res
          .status(403)
          .json({ error: "Please activate your account, check your email for the activation link." });
@@ -346,25 +369,121 @@ exports.signin = (req, res) => {
     
 };
 
-// Reset Password
+// Forgot Password
+exports.forgotPassword = (req, res) => {
+  defaultAuth
+    .getUserByEmail(req.body.email)
+    .then(async (userRecord) => {
+      await db
+        .doc(`/users/${userRecord.uid}`)
+        .get()
+        .then(async (doc) => {
+          if (doc.exists) {
+            const userData = doc.data();
+            let generatedToken = uuid();
+            const msg = {
+              to: `${userData.email}`, // recipient
+              from: 'LEVLS. <noreply@levls.io>', // Change to verified sender
+              template_id: 'd-fe6fd5a700634f01a11e477d1bace216',
+              dynamic_template_data: {
+                subject: 'Levls Reset Password Request',
+                username: userData.fullname || userData.username,
+                url: `https://levls.io/reset-password/${generatedToken}`,
+                buttonText: 'Reset Password',
+              },
+            };
+            const resetPasswordData = {
+              code: generatedToken,
+              createdAt: new Date().toISOString(),
+              userId: userData.userId,
+            };
+            await db
+              .doc(`resetPasswordTokens/${generatedToken}`)
+              .set(resetPasswordData)
+            .then(async () => {
+              await sgMail.send(msg);
+            return res
+              .status(201)
+              .json({ success: 'Please check your email for the reset password link.' });
+            })
+          }
+        });
+    })
+    .catch((error) => {
+      if (error.code === 'auth/user-not-found') {
+        return res
+          .status(403)
+          .json({ error: 'the email address does not exist' });
+      }
+      console.log('Error fetching user data:', error);
+    });
+};
+
+// Reset Password 
 exports.resetPassword = (req, res) => {
-  const email = req.body.email
-  console.log(req.body)
-  const { valid, errors } = validateEmailData(email);
+
+  const newPassword = {
+    password: req.body.password,
+    confirmPassword: req.body.confirmPassword,
+  };
+
+  const getTokenDoc = db
+    .doc(`resetPasswordTokens/${req.body.code}`)
+
+  const { valid, errors } = validatePasswordChange(newPassword);
 
   if (!valid) return res.status(400).json(errors);
 
-  firebase
-    .auth()
-    .sendPasswordResetEmail(email)
-    .then(() => {
-      return res.status(201).json({success: "email sent, please check your inbox and spam/junk folders."});
+  getTokenDoc
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res
+          .status(403)
+          .json({ error: 'Invalid token please request a new token' });
+      } else {
+        const data = doc.data();
+        const currentDate = dayjs(new Date());
+        const createdAt = dayjs(data.createdAt);
+        const expiryDate = currentDate.diff(createdAt, 'hour');
+        if (expiryDate / 24 >= 2) return res
+          .status(403)
+          .json({ error: 'Invalid token please request a new token' });
+        // console.log(date1.diff(date2, 'hour'));
+        defaultAuth
+          .updateUser(data.userId, { password: newPassword.password })
+          .then(async () => {
+            await db.doc(`users/${data.userId}`)
+              .get()
+              .then(async (userDoc) => {
+                const userData = userDoc.data();
+                const msg = {
+                  to: `${userData.email}`, // recipient
+                  from: 'LEVLS. <noreply@levls.io>', // Change to verified sender
+                  template_id: 'd-6e028d8750a64cddbce63c8570951395',
+                  dynamic_template_data: {
+                    subject: 'Levls Password Reset',
+                    username: userData.fullname || userData.username,
+                    url: `https://levls.io/login`,
+                    buttonText: 'Login',
+                  },
+                };
+                await sgMail.send(msg);
+              })
+              .then(async () => {
+                await getTokenDoc.delete();
+                return res
+                  .status(201)
+                  .json({ success: 'Your password has been changed' });
+              });
+          });
+      }
     })
     .catch((err) => {
       console.error(err);
       return res
         .status(403)
-        .json({ error: "email doesn't exist, please create an account" });
+        .json({ error: 'Something went wrong please try again later' });
     });
 };
 
@@ -381,7 +500,7 @@ exports.updateEmailAdd = (req, res) => {
   const { valid, errors } = validateEmailData(newEmail);
   if (!valid) return res.status(400).json(errors);
   
-  console.log(newEmail)
+  // console.log(newEmail)
 
   user
     .updateEmail(newEmail)
@@ -554,24 +673,7 @@ exports.getUserData = (req, res) => {
         });
         
       });
-      return db
-        .collection(`users/${req.params.userId}/interests`)
-        .orderBy("createdAt", "desc")
-        .limit(5)
-        .get();
-    })
-    .then((data) => {
-      userData.interests = [];
-      data.forEach((doc) => {
-        userData.interests.push({
-          interestId: doc.id,
-          interestList: doc.data().interestList,
-          otherInterestList: doc.data().otherInterestList,
-          createdAt: doc.data().createdAt,
-        });
-        
-      });
-      return res.json(userData);
+      return res.json(userData)
     })
     .catch((err) => {
       console.error(err);
@@ -651,24 +753,7 @@ exports.getAuthenticatedUser = (req, res) => {
         });
         
       });
-      return db
-        .collection(`users/${req.user.userId}/interests`)
-        .orderBy("createdAt", "desc")
-        .limit(5)
-        .get();
-    })
-    .then((data) => {
-      userData.interests = [];
-      data.forEach((doc) => {
-        userData.interests.push({
-          interestId: doc.id,
-          interestList: doc.data().interestList,
-          otherInterestList: doc.data().otherInterestList,
-          createdAt: doc.data().createdAt,
-        });
-        
-      });
-      return res.json(userData);
+      return res.json(userData)
     })
     .catch((err) => {
       console.error(err);
@@ -722,7 +807,7 @@ exports.uploadImage = (req, res) => {
     let imageToBeUploaded = {};
     let imageFileName;
     // String for image token
-    let generatedToken = uuidv4();
+    let generatedToken = uuid();
 
 
     busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
@@ -791,7 +876,7 @@ exports.uploadBackgroundImage = (req, res) => {
     let imageToBeUploaded = {};
     let imageFileName;
     // String for image token
-    let generatedToken = uuidv4();
+    let generatedToken = uuid();
 
 
     busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
@@ -853,7 +938,7 @@ exports.uploadCV = (req, res) => {
   let imageToBeUploaded = {};
   let imageFileName;
   // String for image token
-  let generatedToken = uuidv4();
+  let generatedToken = uuid();
   
 
   busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
@@ -984,53 +1069,81 @@ exports.deleteNotification = (req, res) => {
 
 exports.activateUser = (req, res) => {
   let profileUrl;
-  
+
   const userDocument = db.doc(`/users/${req.params.userId}`);
   let username;
   let userData;
-  userDocument
-    .get()
-    .then((doc) => {
-      if (doc.exists) {
-        const companyLink = `https://levls.io/company-profile/${req.params.userId}`;
-        const userLink = `https://levls.io/profile/${req.params.userId}`;
-         
-        var options = {
-          method: 'POST',
-          url: `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${config.apiKey}`,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            dynamicLinkInfo: {
-              domainUriPrefix: 'https://levlsapp.page.link',
-              link: doc.data().userType === "Organisation" ? companyLink : userLink,
-              androidInfo: { androidPackageName: 'com.pandabares.justappli' },
-            },
-          }),
-        };
-        userData = doc.data();
-        username = userData.username
-        userData.userId = doc.id;
-        const url = `https://levls.io/${doc.data().userType === "Organisation" ?'company-profile': 'profile'}/${req.params.userId}`;
-        request(options, function (error, response) {
-          if (error) throw new Error(error);
-          const data = JSON.parse(response.body);
-          // console.log(data)
-          profileUrl = data.shortLink? data.shortLink : url
-          userDocument.update({ isActive: true, verified: true, profileUrl: profileUrl });
-        });
-        db.doc(`/usernames/${username}`).update({ isActive: true });
-        return res.status(202).json({ success: 'your account is now active you may log in' })
-      } else {
-        return res.status(404).json({ error: 'Your token Has expired' });
-      }      
+
+  defaultAuth
+    .updateUser(req.params.userId, {
+      emailVerified: true,
     })
-    .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
+    .then(() => {
+      userDocument
+        .get()
+        .then((doc) => {
+          if (doc.exists) {
+            const companyLink = `https://levls.io/company-profile/${req.params.userId}`;
+            const userLink = `https://levls.io/profile/${req.params.userId}`;
+
+            var options = {
+              method: 'POST',
+              url: `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${config.apiKey}`,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                dynamicLinkInfo: {
+                  domainUriPrefix: 'https://levlsapp.page.link',
+                  link:
+                    doc.data().userType === 'Organisation'
+                      ? companyLink
+                      : userLink,
+                  androidInfo: {
+                    androidPackageName: 'com.pandabares.justappli',
+                  },
+                },
+              }),
+            };
+            userData = doc.data();
+            username = userData.username;
+            userData.userId = doc.id;
+            const url = `https://levls.io/${
+              doc.data().userType === 'Organisation'
+                ? 'company-profile'
+                : 'profile'
+            }/${req.params.userId}`;
+            request(options, function (error, response) {
+              if (error) throw new Error(error);
+              const data = JSON.parse(response.body);
+              // console.log(data)
+              profileUrl = data.shortLink ? data.shortLink : url;
+              userDocument.update({
+                isActive: true,
+                verified: true,
+                profileUrl: profileUrl,
+              });
+            });
+            db.doc(`/usernames/${username}`).update({ isActive: true });
+            return res
+              .status(202)
+              .json({ success: 'your account is now active you may log in' });
+          } else {
+            return res.status(404).json({ error: 'Your token Has expired' });
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+          return res.status(500).json({ error: err.code });
+        });
+    })
+    .catch((error) => {
+      console.log('Error updating user:', error);
+      return res
+        .status(500)
+        .json({ error: 'something went wrong, please try again later' });
     });
-}
+};
 
 exports.getLoggedInUserFollowingList = (req, res) => {
 

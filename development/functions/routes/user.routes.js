@@ -28,6 +28,7 @@ const {
   getLoggedInUserFollowingList,
   editComment,
   addProfileUrlToAllUsers,
+  forgotPassword,
 } = require('../controllers/user.controller');
 
 
@@ -35,6 +36,7 @@ const router = express.Router()
 
 router.route('/signup')
   .post(signup)
+
 
 router.route('/signin')
   .post(signin)
@@ -85,8 +87,11 @@ router.route('/users')
 router.route('/user-following')
   .get(FBAuth.protect, getLoggedInUserFollowingList)
 
-router.route('/reset-password')
-  .post(resetPassword)
+// router.route('/reset-password')
+//   .post(resetPassword)
+
+router.route('/forgot-password').post(forgotPassword);
+router.route('/reset-password').post(resetPassword);
 
 router.route('/notifications/:notificationId')
   .post(FBAuth.protect, markNotificationsRead)
