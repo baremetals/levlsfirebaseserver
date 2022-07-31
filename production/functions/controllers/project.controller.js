@@ -62,6 +62,7 @@ exports.createProject = (req, res) => {
     const newProject = {
       uploadUrl: req.body.customUrl,
       title: req.body.title,
+      shortDescription: req.body.shortDescription,
       description: req.body.description,
       slug,
       category: req.body.category,
@@ -78,7 +79,8 @@ exports.createProject = (req, res) => {
       isApplication: req.body.isApplication,
       registerLink: req.body.registerLink,
       isActive: false,
-      viewsCount: 0
+      viewsCount: 0,
+      pageUrl: `project/${slug}`,
     };
 
     db.collection('projects')
@@ -168,6 +170,7 @@ exports.createProject = (req, res) => {
       newProject.commentCount = 0
       newProject.viewsCount = 0
       newProject.isActive = false
+      newProject.pageUrl = `project/${slug}`
       db.collection('projects')
         .add(newProject)
         .then((doc) => {

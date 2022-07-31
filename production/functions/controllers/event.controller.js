@@ -144,6 +144,7 @@ exports.createEvent = (req, res) => {
     newEvent.viewsCount = 0
     newEvent.isActive = false
     newEvent.isPartner = isPartner
+    newEvent.pageUrl = `events/${slug}`;
     db.collection('events')
       .add(newEvent)
       .then((doc) => {

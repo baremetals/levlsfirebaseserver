@@ -145,6 +145,7 @@ exports.createResource = (req, res) => {
       isActive: false,
       viewsCount: 0,
       resourceType: req.body.resourceType,
+      pageUrl: `resources/${slug}`,
       //registerLink: req.body.registerLink || ''
     };
 
@@ -256,6 +257,7 @@ exports.createResource = (req, res) => {
       newResource.likeCount = 0
       newResource.commentCount = 0
       newResource.viewsCount = 0
+      newResource.pageUrl = `resources/${slug}`
       db.collection('resources')
         .add(newResource)
         .then((doc) => {

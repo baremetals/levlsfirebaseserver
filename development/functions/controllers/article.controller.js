@@ -92,7 +92,8 @@ exports.writeAnArticle = (req, res) => {
       contentType: 'article',
       isActive: false,
       viewsCount: 0,
-      isPartner: req.user.isPartner,
+      isPartner: false,
+      pageUrl: `article/${slug}`,
     };
 
     db.collection('articles')
@@ -115,7 +116,7 @@ exports.writeAnArticle = (req, res) => {
     const imageUrl = req.user.imageUrl
     const userId = req.user.userId
     const username = req.user.username
-    const isPartner = req.user.isPartner
+
 
     let imageToBeUploaded = {};
     let imageFileName;
@@ -183,22 +184,24 @@ exports.writeAnArticle = (req, res) => {
       newArticle.commentCount = 0
       newArticle.viewsCount = 0
       newArticle.isActive = false
-      newArticle.isPartner = isPartner
-      db.collection('articles')
-        .add(newArticle)
-        .then((doc) => {
-          resArticle = newArticle;
-          resArticle.timelineId = doc.id;
-          docId = doc.id;
-        })
-        .then(() => {
-          db.doc(`mobile timeline/${docId}`).set(resArticle)
-          return res.json(resArticle);
-        })
-        .catch((err) => {
-          res.status(500).json({ error: 'something went wrong' });
-          console.error(err);
-        });
+      newArticle.isPartner = false
+      newArticle.pageUrl = `article/${slug}`
+        db
+          .collection('articles')
+          .add(newArticle)
+          .then((doc) => {
+            resArticle = newArticle;
+            resArticle.timelineId = doc.id;
+            docId = doc.id;
+          })
+          .then(() => {
+            db.doc(`mobile timeline/${docId}`).set(resArticle);
+            return res.json(resArticle);
+          })
+          .catch((err) => {
+            res.status(500).json({ error: 'something went wrong' });
+            console.error(err);
+          });
     });
 
     busboy.end(req.rawBody);

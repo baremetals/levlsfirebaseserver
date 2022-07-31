@@ -143,6 +143,18 @@ exports.signup = (req, res) => {
               signUpCode: newUser.signUpCode,
             };
             await db.doc(`/users/${userId}`).set(userCredentials);
+            await db
+              .doc(`users/${userId}/followings/${config.levlsUserId}`)
+              .set({
+                createdAt: new Date().toISOString(),
+                followedUserId: config.levlsUserId,
+                followedUserImageUrl: config.levlsLogoUrl,
+                followedUserUsername: 'levls',
+                followedUserBkImage: config.levlsBkImage,
+                followedUserCity: 'London',
+                followedUserCountry: 'UK',
+                followedUserOccupationOrIndustry: 'Technology',
+              });
             return db
               .collection('usernames')
               .doc(`${newUser.username}`)
@@ -305,68 +317,35 @@ exports.changeUsername = (req, res) => {
 }
 // Log user in
 exports.signin = (req, res) => {
-  const user = {
-    email: req.body.email,
-    password: req.body.password,
-  };
-  let userDoc;
-  const getUser = db
-    .collection('users')
-    .where("email", "==", user.email)
-    .limit(1)
+  const idToken = req.body.idToken;
+  const expiresIn = 60 * 60 * 24 * 7 * 1000;
+  defaultAuth.verifyIdToken(idToken).then((decodedIdToken) => {
+    if (new Date().getTime() / 1000 - decodedIdToken.auth_time < 5 * 60) {
+      return defaultAuth.createSessionCookie(idToken, { expiresIn }).then(
+        (sessionCookie) => {
+          const options = {
+            maxAge: expiresIn,
+            httpOnly: true,
+            secure: true,
+          };
+          res.cookie('session', sessionCookie, options);
+          res.end(
+            JSON.stringify({ status: 'success', session: sessionCookie })
+          );
+        },
+        (_error) => {
+          res.status(401).send('UNAUTHORIZED REQUEST!');
+        }
+      );
+    }
+    res.status(401).send('Recent sign in required!');
+  });
+};
 
-  const { valid, errors } = validateLoginData(user);
-
-  if (!valid) return res.status(400).json(errors);
-
-  getUser
-    .get()
-    .then((data) => {
-      if (data) {
-        data.forEach((doc) => {
-          userDoc = doc.data()
-        })
-       return userDoc
-      }
-    })
-    .then(() => {
-      if (userDoc.verified !== true) {
-        // console.log(userDoc.verified)
-        return res
-         .status(403)
-         .json({ error: "Please activate your account, check your email for the activation link." });
-      } else {
-        firebase
-          .auth()
-          .signInWithEmailAndPassword(user.email, user.password)
-          .then((data) => {
-            return data.user.getIdToken();
-          })
-          .then((token) => {
-            return res.json({ token });
-          })
-          .catch(function(error) {
-            console.error(error);
-            console.log(error)
-            if (error.code.startsWith('auth')) {
-              return res
-              .status(403)
-              .json({ error: "wrong email or password, please try again"});
-            } else {
-              return res
-              .status(403)
-              .json({ error: "wrong credentials, please try again" });
-            }
-          });
-      }
-    })
-    .catch(function(error) {
-      console.error(error);
-      return res
-        .status(403)
-        .json({ error: "wrong credentials, please try again" });
-    });
-    
+// Logout
+exports.logout = (_req, res) => {
+  res.clearCookie('session');
+  res.status(201).send('You are logged out!');
 };
 
 // Forgot Password
@@ -798,7 +777,7 @@ exports.uploadImage = (req, res) => {
 
   if (req.body.imageUrl) {
     const imageUrl = req.body.imageUrl
-    db.doc(`/users/${req.user.uid}`).update({ imageUrl });
+    db.doc(`/users/${req.user.userId}`).update({ imageUrl });
     return res.json({ success: "image uploaded successfully" });
   } else {
 
@@ -844,7 +823,7 @@ exports.uploadImage = (req, res) => {
         .then(() => {
           // Append token to url
           const imageUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/profile-images%2F${imageFileName}?alt=media&token=${generatedToken}`;
-          return db.doc(`/users/${req.user.uid}`).update({ imageUrl });
+          return db.doc(`/users/${req.user.userId}`).update({ imageUrl });
         })
         .then(() => {
           return res.json({ success: "image uploaded successfully" });
@@ -867,7 +846,7 @@ exports.uploadBackgroundImage = (req, res) => {
 
   if (req.body.backgroundImage) {
     const backgroundImage = req.body.backgroundImage
-    db.doc(`/users/${req.user.uid}`).update({ backgroundImage });
+    db.doc(`/users/${req.user.userId}`).update({ backgroundImage });
     return res.json({ success: "image uploaded successfully" });
     
   } else {
@@ -912,7 +891,9 @@ exports.uploadBackgroundImage = (req, res) => {
         .then(() => {
           // Append token to url
           const backgroundImage = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/user-uploads%2F${imageFileName}?alt=media&token=${generatedToken}`;
-          return db.doc(`/users/${req.user.uid}`).update({ backgroundImage });
+          return db
+            .doc(`/users/${req.user.userId}`)
+            .update({ backgroundImage });
         })
         .then(() => {
           return res.json({ success: "image uploaded successfully" });
@@ -975,7 +956,7 @@ exports.uploadCV = (req, res) => {
       .then(() => {
         // Append token to url
         const CV = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/user-cv%2F${imageFileName}?alt=media&token=${generatedToken}`;
-        return db.doc(`/users/${req.user.uid}`).update({ CV });
+        return db.doc(`/users/${req.user.userId}`).update({ CV });
       })
       .then(() => {
         return res.json({ success: "Your CV was uploaded successfully" });
@@ -1162,18 +1143,21 @@ exports.getLoggedInUserFollowingList = (req, res) => {
     .then((data) => {
       userData.followings = [];
       data.forEach((doc) => {
-        userData.followings.push({
-          followingId: doc.id,
-          followedUserBkImage: doc.data().followedUserBkImage,
-          followedUserCountry: doc.data().followedUserCountry,
-          followedUserCity: doc.data().followedUserCity,
-          createdAt: doc.data().createdAt,
-          followedUserId: doc.data().followedUserId,
-          followedUserImageUrl: doc.data().followedUserImageUrl,
-          followedUserOccupationOrIndustry: doc.data().followedUserOccupationOrIndustry,
-          followedUserUsername: doc.data().followedUserUsername,
-          fieldOfStudy:doc.data().fieldOfStudy
-        });
+        if (doc.id !== config.levlsUserId) {
+          userData.followings.push({
+            followingId: doc.id,
+            followedUserBkImage: doc.data().followedUserBkImage,
+            followedUserCountry: doc.data().followedUserCountry,
+            followedUserCity: doc.data().followedUserCity,
+            createdAt: doc.data().createdAt,
+            followedUserId: doc.data().followedUserId,
+            followedUserImageUrl: doc.data().followedUserImageUrl,
+            followedUserOccupationOrIndustry:
+              doc.data().followedUserOccupationOrIndustry,
+            followedUserUsername: doc.data().followedUserUsername,
+            fieldOfStudy: doc.data().fieldOfStudy,
+          });
+        }
       });
       return res.json(userData);
     })

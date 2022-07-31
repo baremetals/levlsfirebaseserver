@@ -4,8 +4,10 @@ const postHelper = require('../controllers/article.controller')
 
 const router = express.Router()
 
-router.route('/articles')
-    .post(FBAuth.protect, postHelper.writeAnArticle)
+router
+  .route('/articles')
+  .post(FBAuth.protect, postHelper.writeAnArticle)
+  .get(postHelper.getAllArticles);
 
 router.route('/articles/:userId')
     .get(postHelper.getAllArticles)

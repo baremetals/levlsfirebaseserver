@@ -2,12 +2,12 @@ const functions = require("firebase-functions");
 const { db } = require('../utils/admin');
 
 
-exports.newArticlePendingNotification = functions
+exports.newUploadPendingNotification = functions
   .region('europe-west2')
   .firestore.document('uploads/{id}')
   .onCreate((snapshot) => {
     db.doc(`uploads/${snapshot.id}`)
-      .update({uploadId: snapshot.id}) 
+      .update({ uploadId: snapshot.id, pageUrl: `upload/${snapshot.id}` })
       .catch((err) => console.error(err));   
 })
 

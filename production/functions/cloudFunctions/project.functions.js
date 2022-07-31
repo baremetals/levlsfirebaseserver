@@ -2,7 +2,7 @@ const functions = require("firebase-functions");
 const { db } = require('../utils/admin');
 
 
-exports.newArticlePendingNotification = functions
+exports.newProjectPendingNotification = functions
   .region('europe-west2')
   .firestore.document('projects/{id}')
   .onCreate((snapshot) => {
@@ -23,7 +23,7 @@ exports.newArticlePendingNotification = functions
     .catch((err) => console.error(err));   
 })
 
-exports.articleActiveNotification = functions
+exports.projectActiveNotification = functions
   .region('europe-west2')
   .firestore.document('projects/{id}')
   .onUpdate((change) => {

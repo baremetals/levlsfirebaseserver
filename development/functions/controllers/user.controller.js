@@ -2,7 +2,7 @@ const { admin, db, firebase, defaultAuth, dayjs } = require('../utils/admin');
 const config = require('../utils/database');
 const { uuid } = require('uuidv4');
 const sgMail = require('@sendgrid/mail');
-var request = require('request');
+const request = require('request');
 // import cookie from 'cookie';
 
 const {
@@ -36,166 +36,6 @@ exports.refreshToken = (req, res) => {
       console.log('Error creating custom token:', error);
     });
 };
-
-// // Sign users up
-// exports.signup = (req, res) => {
-//   let usageTotalRef;
-//   const increment = admin.firestore.FieldValue.increment(1);
-//   const inActiveUsersRef = db.collection('site stats').doc('inactive-users');
-//   const totalUsersRef = db.collection('site stats').doc('all-users');
-//   if (req.body.signUpCode !== '')
-//     usageTotalRef = db.collection('codes').doc(req.body.signUpCode);
-//   const batch = db.batch();
-
-//   const adminMsg = {
-//     to: 'admin@levls.io', // recipient
-//     from: 'LEVLS. <noreply@levls.io>',
-//     subject: `New user sign up - ${req.body.username}`,
-//     text: `${req.body.username}, just created an account`,
-//     html: `
-//         <h3> Hello Admin </h3>
-//         <p>You have a new ${req.body.userType || 'Personal'} user.</p>
-//         <p>Thank You.</p>
-//         <p>LEVLS</p>
-//       `,
-//   };
-
-//   const newUser = {
-//     username: req.body.username,
-//     dateOfBirth: req.body.dateOfBirth,
-//     email: req.body.email,
-//     password: req.body.password,
-//     confirmPassword: req.body.confirmPassword,
-//     userType: req.body.userType || 'Personal',
-//     deviceToken: req.body.deviceToken || '',
-//     signUpCode: req.body.signUpCode || '',
-//   };
-
-//   const { valid, errors } = validateSignupData(newUser);
-//   const noImg = 'default.jpg';
-//   const bkgImage = 'background.jpg';
-//   let userId, uid;
-
-//   if (!valid) {
-//     return res.status(400).json(errors);
-//   } else {
-//     firebase
-//       .auth()
-//       .createUserWithEmailAndPassword(newUser.email, newUser.password)
-//       .then((data) => {
-//         userId = data.user.uid;
-//         uid = data.user.uid;
-//         return data.user.getIdToken();
-//       })
-//       .then(() => {
-//         const userCredentials = {
-//           createdAt: new Date().toISOString(),
-//           updatedAt: new Date().toISOString(),
-//           fullname: '',
-//           Pronouns: '',
-//           organisationName: '',
-//           username: newUser.username,
-//           occupation: '',
-//           dateOfbirth: newUser.dateOfBirth,
-//           email: newUser.email,
-//           mobile: '',
-//           gender: '',
-//           imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
-//           backgroundImage: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${bkgImage}?alt=media&token=${config.defaultbkimgtoken}`,
-//           userId,
-//           bio: '',
-//           CV: '',
-//           website: '',
-//           slogan: '',
-//           founded: '',
-//           industry: '',
-//           companySize: '',
-//           organisationType: '',
-//           numberOrname: '',
-//           street: '',
-//           city: 'London',
-//           country: 'England',
-//           postcode: '',
-//           followersCount: 0,
-//           followingCount: 0,
-//           userType: newUser.userType,
-//           isAdmin: false,
-//           verified: false,
-//           acceptedTerms: true,
-//           isActive: false,
-//           isPartner: false,
-//           deviceToken: newUser.deviceToken,
-//           instagram: '',
-//           tiktok: '',
-//           twitter: '',
-//           linkedIn: '',
-//           profileUrl: '',
-//           signUpCode: newUser.signUpCode,
-//         };
-//         db.doc(`/users/${userId}`).set(userCredentials);
-//         return db.collection('usernames').doc(`${newUser.username}`).get();
-//       })
-//       .then((doc) => {
-//         if (doc.exists) {
-//           return res.status(400).json({ error: 'username is already taken' });
-//         } else {
-//           return db
-//             .collection('usernames')
-//             .doc(`${newUser.username}`)
-//             .set({
-//               uid,
-//               createdAt: new Date().toISOString(),
-//               imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
-//               fullname: '',
-//               organisationName: '',
-//               isActive: false,
-//             });
-//         }
-//       })
-//       .then(() => {
-//         const userExperience = {};
-//         db.collection(`users/${userId}/experiences`).add(userExperience);
-//       })
-//       .then(() => {
-//         const userEducation = {};
-//         db.collection(`users/${userId}/educations`).add(userEducation);
-//       })
-//       .then(() => {
-//         const userSkills = {};
-//         db.collection(`users/${userId}/skills`).add(userSkills);
-//       })
-//       .then(() => {
-//         const userInterests = {};
-//         db.collection(`users/${userId}/interests`).add(userInterests);
-//         //
-//       })
-//       .then(() => {
-//         batch.set(totalUsersRef, { totalCount: increment }, { merge: true });
-//         batch.set(inActiveUsersRef, { totalCount: increment }, { merge: true });
-//         if (req.body.signUpCode !== '')
-//           batch.set(usageTotalRef, { usageTotal: increment }, { merge: true });
-//         batch.commit();
-//       })
-//       .then(async () => {
-//         await sgMail.send(adminMsg);
-//         return res
-//           .status(201)
-//           .json({ success: 'Your user account has been created.' });
-//       })
-//       .catch((err) => {
-//         console.error(err);
-//         if (err.code === 'auth/email-already-in-use') {
-//           return res.status(400).json({ error: 'Email is already in use' });
-//         } else {
-//           return res
-//             .status(500)
-//             .json({
-//               error: 'The server is out for lunch, please try again later.',
-//             });
-//         }
-//       });
-//   }
-// };
 
 // Create a unique username
 
@@ -297,7 +137,7 @@ exports.changeUsername = (req, res) => {
     });
 };
 // Log user in
-exports.signin = (req, res) => {
+exports.sessionsLogin = (req, res) => {
   const user = {
     email: req.body.email,
     password: req.body.password,
@@ -325,12 +165,10 @@ exports.signin = (req, res) => {
     .then(() => {
       if (userDoc.verified !== true) {
         console.log(userDoc.verified);
-        return res
-          .status(403)
-          .json({
-            error:
-              'Please activate your account, check your email for the activation link.',
-          });
+        return res.status(403).json({
+          error:
+            'Please activate your account, check your email for the activation link.',
+        });
       } else {
         firebase
           .auth()
@@ -692,7 +530,7 @@ exports.uploadImage = (req, res) => {
 
   if (req.body.imageUrl) {
     const imageUrl = req.body.imageUrl;
-    db.doc(`/users/${req.user.uid}`).update({ imageUrl });
+    db.doc(`/users/${req.user.userId}`).update({ imageUrl });
     return res.json({ success: 'image uploaded successfully' });
   } else {
     const busboy = new BusBoy({ headers: req.headers });
@@ -740,7 +578,7 @@ exports.uploadImage = (req, res) => {
         .then(() => {
           // Append token to url
           const imageUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/profile-images%2F${imageFileName}?alt=media&token=${generatedToken}`;
-          return db.doc(`/users/${req.user.uid}`).update({ imageUrl });
+          return db.doc(`/users/${req.user.userId}`).update({ imageUrl });
         })
         .then(() => {
           return res.json({ success: 'image uploaded successfully' });
@@ -763,7 +601,7 @@ exports.uploadBackgroundImage = (req, res) => {
 
   if (req.body.backgroundImage) {
     const backgroundImage = req.body.backgroundImage;
-    db.doc(`/users/${req.user.uid}`).update({ backgroundImage });
+    db.doc(`/users/${req.user.userId}`).update({ backgroundImage });
     return res.json({ success: 'image uploaded successfully' });
   } else {
     const busboy = new BusBoy({ headers: req.headers });
@@ -811,7 +649,9 @@ exports.uploadBackgroundImage = (req, res) => {
         .then(() => {
           // Append token to url
           const backgroundImage = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/user-uploads%2F${imageFileName}?alt=media&token=${generatedToken}`;
-          return db.doc(`/users/${req.user.uid}`).update({ backgroundImage });
+          return db
+            .doc(`/users/${req.user.userId}`)
+            .update({ backgroundImage });
         })
         .then(() => {
           return res.json({ success: 'image uploaded successfully' });
@@ -880,7 +720,7 @@ exports.uploadCV = (req, res) => {
       .then(() => {
         // Append token to url
         const CV = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/user-cv%2F${imageFileName}?alt=media&token=${generatedToken}`;
-        return db.doc(`/users/${req.user.uid}`).update({ CV });
+        return db.doc(`/users/${req.user.userId}`).update({ CV });
       })
       .then(() => {
         return res.json({ success: 'Your CV was uploaded successfully' });
@@ -991,7 +831,7 @@ exports.activateUser = (req, res) => {
             const companyLink = `https://levls.io/company-profile/${req.params.userId}`;
             const userLink = `https://levls.io/profile/${req.params.userId}`;
 
-            var options = {
+            const options = {
               method: 'POST',
               url: `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${config.apiKey}`,
               headers: {
@@ -1067,19 +907,21 @@ exports.getLoggedInUserFollowingList = (req, res) => {
     .then((data) => {
       userData.followings = [];
       data.forEach((doc) => {
-        userData.followings.push({
-          followingId: doc.id,
-          followedUserBkImage: doc.data().followedUserBkImage,
-          followedUserCountry: doc.data().followedUserCountry,
-          followedUserCity: doc.data().followedUserCity,
-          createdAt: doc.data().createdAt,
-          followedUserId: doc.data().followedUserId,
-          followedUserImageUrl: doc.data().followedUserImageUrl,
-          followedUserOccupationOrIndustry:
+        if (doc.id !== config.levlsUserId) {
+          userData.followings.push({
+            followingId: doc.id,
+            followedUserBkImage: doc.data().followedUserBkImage,
+            followedUserCountry: doc.data().followedUserCountry,
+            followedUserCity: doc.data().followedUserCity,
+            createdAt: doc.data().createdAt,
+            followedUserId: doc.data().followedUserId,
+            followedUserImageUrl: doc.data().followedUserImageUrl,
+            followedUserOccupationOrIndustry:
             doc.data().followedUserOccupationOrIndustry,
-          followedUserUsername: doc.data().followedUserUsername,
-          fieldOfStudy: doc.data().fieldOfStudy,
-        });
+            followedUserUsername: doc.data().followedUserUsername,
+            fieldOfStudy: doc.data().fieldOfStudy,
+          });
+        }
       });
       return res.json(userData);
     })
@@ -1321,7 +1163,7 @@ exports.addProfileUrlToAllUsers = (_req, res) => {
           profile = 'profile';
         } else profile = 'company-profile';
 
-        var options = {
+        const options = {
           method: 'POST',
           url: `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${config.apiKey}`,
           headers: {
@@ -1473,7 +1315,7 @@ exports.resetPassword = (req, res) => {
 };
 
 // Log user in
-exports.signinNew = (req, res) => {
+exports.sessionsLogin = (req, res) => {
   const user = {
     email: req.body.email,
     password: req.body.password,
@@ -1554,6 +1396,7 @@ exports.signinNew = (req, res) => {
         .json({ error: 'wrong credentials, please try again' });
     });
 };
+
 
 // Sign users up
 exports.signup = (req, res) => {
@@ -1659,6 +1502,18 @@ exports.signup = (req, res) => {
               signUpCode: newUser.signUpCode,
             };
             await db.doc(`/users/${userId}`).set(userCredentials);
+            await db
+              .doc(`users/${userId}/followings/${config.levlsUserId}`)
+              .set({
+                createdAt: new Date().toISOString(),
+                followedUserId: config.levlsUserId,
+                followedUserImageUrl: config.levlsLogoUrl,
+                followedUserUsername: 'levls',
+                followedUserBkImage: config.levlsBkImage,
+                followedUserCity: 'London',
+                followedUserCountry: 'UK',
+                followedUserOccupationOrIndustry: 'Technology',
+              });
             return db
               .collection('usernames')
               .doc(`${newUser.username}`)
@@ -1669,25 +1524,25 @@ exports.signup = (req, res) => {
                 fullname: '',
                 isActive: false,
               })
-              .then(() => {
-                const userExperience = {};
-                db.collection(`users/${userId}/experiences`).add(
-                  userExperience
-                );
-              })
-              .then(() => {
-                const userEducation = {};
-                db.collection(`users/${userId}/educations`).add(userEducation);
-              })
-              .then(() => {
-                const userSkills = {};
-                db.collection(`users/${userId}/skills`).add(userSkills);
-              })
-              .then(() => {
-                const userInterests = {};
-                db.collection(`users/${userId}/interests`).add(userInterests);
-                //
-              })
+              // .then(() => {
+              //   const userExperience = {};
+              //   db.collection(`users/${userId}/experiences`).add(
+              //     userExperience
+              //   );
+              // })
+              // .then(() => {
+              //   const userEducation = {};
+              //   db.collection(`users/${userId}/educations`).add(userEducation);
+              // })
+              // .then(() => {
+              //   const userSkills = {};
+              //   db.collection(`users/${userId}/skills`).add(userSkills);
+              // })
+              // .then(() => {
+              //   const userInterests = {};
+              //   db.collection(`users/${userId}/interests`).add(userInterests);
+              //   //
+              // })
               .then(() => {
                 batch.set(
                   totalUsersRef,
@@ -1739,3 +1594,61 @@ exports.signup = (req, res) => {
       })      
   }
 };
+
+
+exports.signin = (req, res) => {
+  // Get the ID token passed and the CSRF token.
+  
+  const idToken = req.body.idToken;
+  // const csrfToken = req.body.csrfToken;
+  // Guard against CSRF attacks.
+  // console.log('the csrfToke: ', csrfToken);
+  // console.log(req.cookies.csrfToken, 'the cookie');
+
+  // if (csrfToken !== req.cookies.csrfToken) {
+  //   res.status(401).send('UNAUTHORIZED REQUEST!');
+  // }
+
+  // Set session expiration to 7 days.
+  const expiresIn = 60 * 60 * 24 * 7 * 1000;
+  // Create the session cookie. This will also verify the ID token in the process.
+  // The session cookie will have the same claims as the ID token.
+  // To only allow session cookie setting on recent sign-in, auth_time in ID token
+  // can be checked to ensure user was recently signed in before creating a session cookie.
+
+  defaultAuth
+    .verifyIdToken(idToken)
+    .then((decodedIdToken) => {
+      // Only process if the user just signed in in the last 5 minutes.
+      if (new Date().getTime() / 1000 - decodedIdToken.auth_time < 5 * 60) {
+        // Create session cookie and set it.
+        return defaultAuth
+          .createSessionCookie(idToken, { expiresIn })
+          .then(
+            (sessionCookie) => {
+              // Set cookie policy for session cookie.
+              const options = {
+                maxAge: expiresIn,
+                httpOnly: true,
+                secure: true,
+              };
+              res.cookie('session', sessionCookie, options);
+              res.end(JSON.stringify({ status: 'success', session: sessionCookie }));
+            },
+            (_error) => {
+              res.status(401).send('UNAUTHORIZED REQUEST!');
+            }
+          );
+      }
+      // A user that was not recently signed in is trying to set a session cookie.
+      // To guard against ID token theft, require re-authentication.
+      res.status(401).send('Recent sign in required!');
+    });
+};
+
+
+exports.logout = (req, res) => {
+  res.clearCookie('session');
+  // res.redirect('/login');
+  res.status(201).send('You are logged out!');
+}

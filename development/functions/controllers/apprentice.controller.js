@@ -1,5 +1,6 @@
 const { admin, db } = require('../utils/admin');
 const sgMail = require('@sendgrid/mail');
+const { uuid } = require('uuidv4');
 
 // Fetch all apprenticeships
 exports.getAllApprenticeships = (req, res) => {
@@ -106,6 +107,7 @@ exports.createAnApprenticeship = (req, res) => {
       contentType: 'apprenticeship',
       isActive: false,
       applicantCount: 0,
+      pageUrl: `apprenticeship/${req.body.jobType.toLowerCase()}/${slug}`,
     };
   
     db.collection('apprenticeships')
@@ -301,7 +303,7 @@ exports.submitApprenticeCVApplication = (req, res) => {
         const busboy = new BusBoy({ headers: req.headers });
         let imageToBeUploaded = {};
         let imageFileName;
-        let generatedToken = uuidv4();
+        let generatedToken = uuid();
 
         busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
           newApplicant[fieldname] = val
@@ -363,7 +365,7 @@ exports.submitApprenticeCVApplication = (req, res) => {
             return apprenticeshipDocument.update({ applicantCount: apprenticeshipData.applicantCount });
           })
           .then(() => {
-            db.doc(`/users/${req.user.uid}`).update({ CV });
+            db.doc(`/users/${userId}`).update({ CV });
             return res.status(201).json({succes: "Your application was submitted succesfully"});
           })
           .catch((err) => {

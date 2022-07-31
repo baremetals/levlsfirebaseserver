@@ -5,7 +5,7 @@ const dayjs = require('dayjs');
 const relativeTime = require('dayjs/plugin/relativeTime');
 dayjs.extend(relativeTime);
 
-var serviceAccount = require('../pandabares-testbed-firebase-adminsdk-s2moh-17fc27619a.json');
+const serviceAccount = require('../pandabares-testbed-firebase-adminsdk-s2moh-17fc27619a.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });

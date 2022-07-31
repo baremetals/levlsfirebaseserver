@@ -145,6 +145,7 @@ exports.createPost = (req, res) => {
       contentType: 'news',
       viewsCount: 0,
       isPartner: req.user.isPartner,
+      pageUrl: `news-articles/${req.category.toLowerCase()}/${slug}`,
     };
 
     db.collection('news')
@@ -255,6 +256,7 @@ exports.createPost = (req, res) => {
       newArticle.commentCount = 0
       newArticle.viewsCount = 0
       newArticle.isPartner = isPartner;
+      newArticle.pageUrl = `news-articles/${newArticle.category.toLowerCase()}/${slug}`;
       db.collection('news')
         .add(newArticle)
         .then((doc) => {

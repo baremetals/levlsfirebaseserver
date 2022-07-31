@@ -1,6 +1,6 @@
 const { admin, db } = require('../utils/admin');
 const config = require("../utils/database");
-const { v4: uuidv4 } = require('uuid');
+const { uuid } = require('uuidv4');
 const sgMail = require('@sendgrid/mail');
 
 // Fetch all grants
@@ -93,13 +93,13 @@ exports.createAGrant = (req, res) => {
       shortDescription: req.body.shortDescription,
       content: req.body.content,
       slug,
-      category: req.body.category || "",
+      category: req.body.category || '',
       grantType: req.body.grantType,
       location: req.body.location,
       region: req.body.region,
-      closingDate: req.body.closingDate || "",
-      applicationLink: req.body.applicationLink || "",
-      howtoApply: req.body.howtoApply || "",
+      closingDate: req.body.closingDate || '',
+      applicationLink: req.body.applicationLink || '',
+      howtoApply: req.body.howtoApply || '',
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
       username: req.user.username,
@@ -108,7 +108,8 @@ exports.createAGrant = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'grants',
       isActive: false,
-      applicantCount: 0
+      applicantCount: 0,
+      pageUrl: `grants/${req.body.grantType.toLowerCase()}/${slug}`,
     };
   
     db.collection('grants')
@@ -255,7 +256,7 @@ exports.submitGrantApplication = (req, res) => {
 
   let imagesToBeUploaded = [];
   let imageFileName = {};
-  let generatedToken = uuidv4();
+  let generatedToken = uuid();
   let imageToAdd = {}
   let uploadUrls = [];
   let newAppilcation = {};
@@ -442,7 +443,7 @@ exports.submitGrantCVApplication = (req, res) => {
         const busboy = new BusBoy({ headers: req.headers });
         let imageToBeUploaded = {};
         let imageFileName;
-        let generatedToken = uuidv4();
+        let generatedToken = uuid();
 
         busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
           newApplicant[fieldname] = val
@@ -504,7 +505,7 @@ exports.submitGrantCVApplication = (req, res) => {
             return grantDocument.update({ applicantCount: grantData.applicantCount });
           })
           .then(() => {
-            db.doc(`/users/${req.user.uid}`).update({ CV });
+            db.doc(`/users/${req.user.userId}`).update({ CV });
             return res.status(201).json({succes: "Your application was submitted succesfully"});
           })
           .catch((err) => {

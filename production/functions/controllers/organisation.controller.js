@@ -2,7 +2,7 @@ const { admin, db, firebase, defaultAuth } = require('../utils/admin');
 const config = require('../utils/database');
 const { v4: uuidv4 } = require('uuid');
 const sgMail = require('@sendgrid/mail');
-var request = require('request');
+const request = require('request');
 
 const {
   validateOrgSignupData,
@@ -131,6 +131,18 @@ exports.register = (req, res) => {
               purpose: newOrg.purpose,
             };
             await db.doc(`/users/${userId}`).set(userCredentials);
+            await db
+              .doc(`users/${userId}/followings/${config.levlsUserId}`)
+              .set({
+                createdAt: new Date().toISOString(),
+                followedUserId: config.levlsUserId,
+                followedUserImageUrl: config.levlsLogoUrl,
+                followedUserUsername: 'levls',
+                followedUserBkImage: config.levlsBkImage,
+                followedUserCity: 'London',
+                followedUserCountry: 'UK',
+                followedUserOccupationOrIndustry: 'Technology',
+              });
             return db
               .collection('usernames')
               .doc(`${newOrg.username}`)

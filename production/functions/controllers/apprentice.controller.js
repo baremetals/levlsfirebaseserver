@@ -1,5 +1,6 @@
 const { admin, db } = require('../utils/admin');
 const sgMail = require('@sendgrid/mail');
+const { uuid } = require('uuidv4');
 
 // Fetch all apprenticeships
 exports.getAllApprenticeships = (req, res) => {
@@ -106,6 +107,7 @@ exports.createAnApprenticeship = (req, res) => {
       contentType: 'apprenticeship',
       isActive: false,
       applicantCount: 0,
+      pageUrl: `apprenticeship/${req.body.jobType.toLowerCase()}/${slug}`,
     };
   
     db.collection('apprenticeships')
@@ -151,42 +153,6 @@ exports.getAnApprenticeship = (req, res) => {
     });
 };
 
-// Review an apprenticeship
-// exports.reviewAnApprenticeship = (req, res) => {
-//   if (req.body.body.trim() === '')
-//     return res.status(400).json({ review: 'Must not be empty' });
-
-//   const newReview = {
-//     body: req.body.body,
-//     createdAt: new Date().toISOString(),
-//     apprenticeshipId: req.params.apprenticeshipId,
-//     username: req.user.username,
-//     userImage: req.user.imageUrl,
-//     rating: req.body.rating
-//   };
-
-//   db.doc(`/apprenticeships/${req.params.apprenticeshipId}`)
-//     .get()
-//     .then((doc) => {
-//       if (!doc.exists) {
-//         return res.status(404).json({ error: 'Apprenticeship not found' });
-//       }
-//       return doc.ref.update({ reviewCount: doc.data().reviewCount + 1 });
-//     })
-//     .then(() => {
-//       return db.collection('reviews').add(newReview);
-//     })
-//     .then(() => {
-//       res.json(newReview);
-//     })
-//     .catch((err) => {
-//       console.log(err);
-//       res.status(500).json({ error: 'Something went wrong' });
-//     });
-// };
-
-// Delete a apprenticeship
-
 exports.deleteAnApprenticeship = (req, res) => {
   const document = db.doc(`/apprenticeships/${req.params.apprenticeshipId}`);
   document
@@ -214,12 +180,15 @@ exports.updateAnApprenticeship = (req, res) => {
 
   apprenticeshipDoc
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Apprenticeship not found' });
       }
-      apprenticeshipDoc.update(apprenticeshipDetails)
-      return db.doc(`/opportunities/${req.params.apprenticeshipId}`).update(apprenticeshipDetails);
+      await apprenticeshipDoc.update(apprenticeshipDetails)
+      await db.doc(`/opportunities/${req.params.apprenticeshipId}`).update(apprenticeshipDetails);
+      await db
+        .doc(`/mobile timeline/${req.params.apprenticeshipId}`)
+        .update(apprenticeshipDetails);
     })
     .then(() => {
       return res.json({ message: "Apprenticeship updated successfully" });
@@ -301,7 +270,7 @@ exports.submitApprenticeCVApplication = (req, res) => {
         const busboy = new BusBoy({ headers: req.headers });
         let imageToBeUploaded = {};
         let imageFileName;
-        let generatedToken = uuidv4();
+        let generatedToken = uuid();
 
         busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
           newApplicant[fieldname] = val
@@ -363,7 +332,7 @@ exports.submitApprenticeCVApplication = (req, res) => {
             return apprenticeshipDocument.update({ applicantCount: apprenticeshipData.applicantCount });
           })
           .then(() => {
-            db.doc(`/users/${req.user.uid}`).update({ CV });
+            db.doc(`/users/${req.user.userId}`).update({ CV });
             return res.status(201).json({succes: "Your application was submitted succesfully"});
           })
           .catch((err) => {
@@ -378,3 +347,38 @@ exports.submitApprenticeCVApplication = (req, res) => {
 }
 
 
+// Review an apprenticeship
+// exports.reviewAnApprenticeship = (req, res) => {
+//   if (req.body.body.trim() === '')
+//     return res.status(400).json({ review: 'Must not be empty' });
+
+//   const newReview = {
+//     body: req.body.body,
+//     createdAt: new Date().toISOString(),
+//     apprenticeshipId: req.params.apprenticeshipId,
+//     username: req.user.username,
+//     userImage: req.user.imageUrl,
+//     rating: req.body.rating
+//   };
+
+//   db.doc(`/apprenticeships/${req.params.apprenticeshipId}`)
+//     .get()
+//     .then((doc) => {
+//       if (!doc.exists) {
+//         return res.status(404).json({ error: 'Apprenticeship not found' });
+//       }
+//       return doc.ref.update({ reviewCount: doc.data().reviewCount + 1 });
+//     })
+//     .then(() => {
+//       return db.collection('reviews').add(newReview);
+//     })
+//     .then(() => {
+//       res.json(newReview);
+//     })
+//     .catch((err) => {
+//       console.log(err);
+//       res.status(500).json({ error: 'Something went wrong' });
+//     });
+// };
+
+// Delete a apprenticeship

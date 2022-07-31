@@ -3,7 +3,7 @@ const { db, admin } = require('../utils/admin');
 const sgMail = require('@sendgrid/mail')
 const config = require('../utils/database');
 const { addToSendgrid } = require('../lib');
-var request = require('request');
+const request = require('request');
 
 
 exports.verifyEmail = functions
@@ -310,21 +310,29 @@ exports.userNameChangeNotification = functions
             batch.update(following, { followedUserUsername: change.after.data().username });
           })
           return db
-            .collection('notifications')
-            .add({
-              createdAt: new Date().toISOString(),
-              message: `your username has been change to ${newUserName}
-              If this wasn't you please contact us.`,
-              type: 'username',
-              read: false,
-              recipient: change.before.data().userId,
-              sender: 'levls',
-              avatar: '',
-              notificationId: change.before.data().userId
-            })
+            .collection(`jobs`)
+            .where('username', '==', change.before.data().username)
+            .get();
         })
-        .then(() => {
-          return batch.commit();
+        .then(async(data) => {
+          data.forEach((doc) => {
+            const job = db.doc(`jobs/${doc.id}`);
+            batch.update(job, { username: change.after.data().username });
+          });
+        })
+        .then(async() => {
+          await batch.commit();
+          return db.collection('notifications').add({
+            createdAt: new Date().toISOString(),
+            message: `your username has been change to ${newUserName}
+              If this wasn't you please contact us.`,
+            type: 'username',
+            read: false,
+            recipient: change.before.data().userId,
+            sender: 'levls',
+            avatar: '',
+            notificationId: change.before.data().userId,
+          }); 
         })
         .catch((err) => console.error(err));
     }  else return null; 

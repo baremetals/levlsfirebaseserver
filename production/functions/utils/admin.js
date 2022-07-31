@@ -6,14 +6,13 @@ const dayjs = require('dayjs');
 const relativeTime = require('dayjs/plugin/relativeTime');
 dayjs.extend(relativeTime);
 
-var serviceAccount = require('../justappli-b9f5c-firebase-adminsdk-pmqeu-3a659971bc.json');
+const serviceAccount = require('../justappli-b9f5c-firebase-adminsdk-pmqeu-3a659971bc.json');
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 firebase.initializeApp(config);
 
 const db = admin.firestore();
 const defaultAuth = admin.auth();
-
 
 module.exports = { admin, db, defaultAuth, firebase, dayjs };

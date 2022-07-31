@@ -92,7 +92,8 @@ exports.writeAnArticle = (req, res) => {
       contentType: 'article',
       isActive: false,
       viewsCount: 0,
-      isPartner: req.user.isPartner,
+      isPartner: false,
+      pageUrl: `article/${slug}`,
     };
 
     db.collection('articles')
@@ -115,7 +116,7 @@ exports.writeAnArticle = (req, res) => {
     const imageUrl = req.user.imageUrl
     const userId = req.user.userId
     const username = req.user.username
-    const isPartner = req.user.isPartner
+    
 
     let imageToBeUploaded = {};
     let imageFileName;
@@ -183,7 +184,8 @@ exports.writeAnArticle = (req, res) => {
       newArticle.commentCount = 0
       newArticle.viewsCount = 0
       newArticle.isActive = false
-      newArticle.isPartner = isPartner
+      newArticle.isPartner = false
+      newArticle.pageUrl = `article/${slug}`;
       db.collection('articles')
         .add(newArticle)
         .then((doc) => {

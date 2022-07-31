@@ -1,6 +1,6 @@
 const { admin, db } = require("../utils/admin");
 const config = require("../utils/database");
-const { uuid } = require('uuidv4');
+const { v4 } = require('uuid');
 
 
 
@@ -252,6 +252,7 @@ exports.userUploads = (req, res) => {
       uploadType: req.body.uploadType,
       videoViewsCount: 0,
       uploadThumbnail: req.body.uploadThumbnail || "",
+      
     };
 
     db.collection('uploads')
@@ -259,6 +260,7 @@ exports.userUploads = (req, res) => {
       .then((doc) => {
         resUpload = newUpload;
         resUpload.timelineId = doc.id;
+        resUpload.pageUrl = `upload/${doc.id}`;
         docId = doc.id
       })
       .then(() => {
@@ -279,7 +281,7 @@ exports.userUploads = (req, res) => {
 
     let contentToBeUploaded = {};
     let uploadFileName;
-    let generatedToken = uuid();
+    let generatedToken = v4();
     let newUpload = {};
 
 
@@ -342,6 +344,7 @@ exports.userUploads = (req, res) => {
         .then((doc) => {
           resUpload = newUpload;
           resUpload.timelineId = doc.id;
+          resUpload.pageUrl = `upload/${doc.id}`;
           docId = doc.id
         })
         .then(() => {
@@ -396,3 +399,22 @@ exports.uploadMetaData = (req,  res) => {
       console.log(err)
     })
 }
+
+// Fetch one upload
+exports.getAnUpload = (req, res) => {
+  let uploadData = {};
+
+  db.doc(`/uploads/${req.params.uploadId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists) {
+        uploadData.credentials = doc.data();
+        return res.status(201).json(uploadData);
+      }
+      return res.status(404).json({ error: 'Upload not found' });
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: err.code });
+    });
+};

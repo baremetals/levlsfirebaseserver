@@ -1,6 +1,6 @@
 const { admin, db } = require('../utils/admin');
 const sgMail = require('@sendgrid/mail');
-
+const { uuid } = require('uuidv4');
 // Fetch all internships
 exports.getAllInternships = (req, res) => {
   db.collection('internships')
@@ -91,19 +91,19 @@ exports.createAnInternship = (req, res) => {
       slug,
       jobType: req.body.jobType,
       location: req.body.location,
-      deadline: req.body.deadline || "",
-      applicationLink: req.body.applicationLink || "",
-      howtoApply: req.body.howtoApply || "",
+      deadline: req.body.deadline || '',
+      applicationLink: req.body.applicationLink || '',
+      howtoApply: req.body.howtoApply || '',
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
       username: req.user.username,
       userId: req.user.userId,
       imageUrl: req.user.imageUrl,
       organisationName: req.user.organisationName,
-      contentType: 'internship',    
+      contentType: 'internship',
       isActive: false,
-      applicantCount: 0
-      
+      applicantCount: 0,
+      pageUrl: `internship/${req.body.jobType.toLowerCase()}/${slug}`,
     };
   
     db.collection('internships')
@@ -301,7 +301,7 @@ exports.submitInternCVApplication = (req, res) => {
         const busboy = new BusBoy({ headers: req.headers });
         let imageToBeUploaded = {};
         let imageFileName;
-        let generatedToken = uuidv4();
+        let generatedToken = uuid();
 
         busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
           newApplicant[fieldname] = val
@@ -363,7 +363,7 @@ exports.submitInternCVApplication = (req, res) => {
             return internshipDocument.update({ applicantCount: internshipData.applicantCount });
           })
           .then(() => {
-            db.doc(`/users/${req.user.uid}`).update({ CV });
+            db.doc(`/users/${req.user.userId}`).update({ CV });
             return res.status(201).json({succes: "Your application was submitted succesfully"});
           })
           .catch((err) => {

@@ -1,8 +1,11 @@
 const functions = require("firebase-functions");
 const algoliasearch = require('algoliasearch');
+const config = require("../utils/database")
 
-const ALGOLIA_ID = functions.config().algolia.app_id;
-const ALGOLIA_ADMIN_KEY = functions.config().algolia.api_key;
+// const ALGOLIA_ID = functions.config().algolia.app_id || config.ALGOLIA_ID;
+// const ALGOLIA_ADMIN_KEY = functions.config().algolia.api_key || config.ALGOLIA_ADMIN_KEY;
+const ALGOLIA_ID = config.ALGOLIA_ID;
+const ALGOLIA_ADMIN_KEY = config.ALGOLIA_ADMIN_KEY;
 const client = algoliasearch(ALGOLIA_ID, ALGOLIA_ADMIN_KEY);
 const ALGOLIA_INDEX_NAME = 'users';
 
@@ -55,6 +58,7 @@ exports.addToOpportunitiesIndex = functions
   return index.saveObject(data);
 })
 
+
 exports.updateOpportunitiesIndex = functions
 .region('europe-west2')
 .firestore.document('opportunities/{id}')
@@ -65,6 +69,7 @@ exports.updateOpportunitiesIndex = functions
   newData.createdAtAsTimestamp = Date.parse(newData.createdAt)
   return index.saveObject(newData);
 })
+
 
 exports.deleteOpportunitiesIndex = functions
 .region('europe-west2')

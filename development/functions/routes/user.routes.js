@@ -29,6 +29,7 @@ const {
   editComment,
   addProfileUrlToAllUsers,
   forgotPassword,
+  logout
 } = require('../controllers/user.controller');
 
 
@@ -40,6 +41,8 @@ router.route('/signup')
 
 router.route('/signin')
   .post(signin)
+
+router.route('/logout').post(logout);
 
 router.route('/user/image')
   .post( FBAuth.protect, uploadImage)
@@ -63,11 +66,12 @@ router.route('/user/:userId')
   .get(getUserData)
 
 router.route('/refresh-token/:userId')
-  .post(FBAuth.protect, refreshToken)
+  .post(refreshToken)
 
-router.route('/user')
+router
+  .route('/user')
   .post(FBAuth.protect, editUserDetails)
-  .get(FBAuth.protect, getAuthenticatedUser)
+  .get(FBAuth.protect, getAuthenticatedUser);
 
 router.route('/user/edit-bio')
   .post(FBAuth.protect, editBio)
