@@ -289,9 +289,21 @@ exports.userUploads = (req, res) => {
 
 
     busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
-      if (mimetype !== "image/jpeg" && mimetype !== "image/jpg" && mimetype !== "image/png" && mimetype !== "image/gif"
-      && mimetype !== "video/mp4" && mimetype !== "video/swf" && mimetype !== "application/pdf" && mimetype !== "application/msword") {
-        return res.status(400).json({ error: "Wrong file type submitted" });
+      if (
+        mimetype !== 'image/jpeg' &&
+        mimetype !== 'image/jpg' &&
+        mimetype !== 'image/png' &&
+        mimetype !== 'image/gif' &&
+        mimetype !== 'audio/webm' &&
+        mimetype !== 'audio/mp3' &&
+        mimetype !== 'audio/wav' &&
+        mimetype !== 'video/webm' &&
+        mimetype !== 'video/mp4' &&
+        mimetype !== 'video/swf' &&
+        mimetype !== 'application/pdf' &&
+        mimetype !== 'application/msword'
+      ) {
+        return res.status(400).json({ error: 'Wrong file type submitted' });
       }
       const contentExtension = filename.split(".")[filename.split(".").length - 1];
       // 32756238461724837.png

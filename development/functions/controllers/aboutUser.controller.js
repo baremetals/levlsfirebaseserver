@@ -339,7 +339,6 @@ exports.updateSkills = (req, res) => {
 };
 
 
-
 // Interests
 exports.addInterestsOld = (req, res) => {
   if (req.body.interestList === [])

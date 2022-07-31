@@ -742,7 +742,6 @@ exports.getAuthenticatedUser = (req, res) => {
 
 // Get all usernames
 exports.getAllUsernames = (_req, res) => {
-  console.log()
   db.collection('usernames')
     .orderBy('createdAt', 'desc')
     .get()
@@ -1396,7 +1395,7 @@ exports.addProfileUrlToAllUsers = (_req, res) => {
           profile = "profile"
         } else profile = "company-profile"
         
-        var options = {
+        let options = {
           'method': 'POST',
           'url': 'https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=AIzaSyCPQI2SBgcSXOSqfn8SAPTIx8sfb6m92fo',
           'headers': {
@@ -1422,5 +1421,37 @@ exports.addProfileUrlToAllUsers = (_req, res) => {
     .catch((err) => {
       console.error(err);
       res.status(500).json({ error: err.code });
+    });
+};
+
+exports.getDigitalCV = (req, res) => {
+  db.collection(`users/${req.params.userId}/digital-cv`)
+    .get()
+    .then((data) => {
+      let cvData = [];
+      data.forEach((doc) => {
+        cvData.push(doc.data());
+      });
+      return res.json(cvData);
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: 'Something went wrong please try again.' });
+    });
+};
+
+exports.getMyDigitalCV = (req, res) => {
+  db.collection(`users/${req.user.userId}/digital-cv`)
+    .get()
+    .then((data) => {
+      let cvData = [];
+      data.forEach((doc) => {
+        cvData.push(doc.data());
+      });
+      return res.json(cvData);
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: 'Something went wrong please try again.' });
     });
 };

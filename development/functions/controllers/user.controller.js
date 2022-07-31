@@ -495,7 +495,7 @@ exports.getAuthenticatedUser = (req, res) => {
 
 // Get all usernames
 exports.getAllUsernames = (_req, res) => {
-  console.log();
+
   db.collection('usernames')
     .orderBy('createdAt', 'desc')
     .get()
@@ -1652,3 +1652,35 @@ exports.logout = (req, res) => {
   // res.redirect('/login');
   res.status(201).send('You are logged out!');
 }
+
+exports.getDigitalCV = (req, res) => {
+  db.collection(`users/${req.params.userId}/digital-cv`)
+    .get()
+    .then((data) => {
+      let cvData = [];
+      data.forEach((doc) => {
+        cvData.push(doc.data());
+      });
+      return res.json(cvData);
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: 'Something went wrong please try again.' });
+    });
+}
+
+exports.getMyDigitalCV = (req, res) => {
+  db.collection(`users/${req.user.userId}/digital-cv`)
+    .get()
+    .then((data) => {
+      let cvData = [];
+      data.forEach((doc) => {
+        cvData.push(doc.data());
+      });
+      return res.json(cvData);
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: 'Something went wrong please try again.' });
+    });
+};
