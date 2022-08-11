@@ -98,6 +98,7 @@ exports.createAJob = (req, res) => {
       location: req.body.location,
       deadline: req.body.deadline || '',
       howtoApply: req.body.howtoApply,
+      customQuestions: req.body.customQuestions,
       applicationLink: req.body.applicationLink || '',
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
@@ -107,6 +108,7 @@ exports.createAJob = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'job',
       isActive: false,
+      state: 'draft',
       applicantCount: 0,
       pageUrl: `job/${req.body.jobType.toLowerCase()}/${slug}`,
     };

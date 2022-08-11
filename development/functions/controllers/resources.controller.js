@@ -10,23 +10,26 @@ exports.getAllResources = (req, res) => {
     .get()
     .then((data) => {
       let resources = [];
-      data.forEach((doc) => {
-        resources.push({
+      data.forEach((doc) => {        
+        resources.push(
+          {
+          ...doc.data(),
           resourceId: doc.id,
-          title: doc.data().title,
-          shortDescription: doc.data().shortDescription,
-          slug: doc.data().slug,
-          content: doc.data().content,
-          username: doc.data().username,
-          createdAt: doc.data().createdAt,
-          uploadUrl: doc.data().uploadUrl,
-          contentType: doc.data().contentType,
-          isActive: doc.data().isActive,
-          likeCount: doc.data().likeCount,
-          commentCount: doc.data().commentCount,
-          viewsCount: doc.data().viewsCount,
-          resourceType: doc.data().resourceType,
-        });
+          //   title: doc.data().title,
+          //   shortDescription: doc.data().shortDescription,
+          //   slug: doc.data().slug,
+          //   content: doc.data().content,
+          //   username: doc.data().username,
+          //   createdAt: doc.data().createdAt,
+          //   uploadUrl: doc.data().uploadUrl,
+          //   contentType: doc.data().contentType,
+          //   isActive: doc.data().isActive,
+          //   likeCount: doc.data().likeCount,
+          //   commentCount: doc.data().commentCount,
+          //   viewsCount: doc.data().viewsCount,
+          //   resourceType: doc.data().resourceType,
+          }
+        );
         
       });
       
@@ -46,24 +49,27 @@ exports.getAllOrgResources = (req, res) => {
     .then((data) => {
       let resources = [];
       data.forEach((doc) => {
-        resources.push({
+        resources.push(
+        {
+          ...doc.data(),
           resourceId: doc.id,
-          title: doc.data().title,
-          shortDescription: doc.data().shortDescription,
-          slug: doc.data().slug,
-          content: doc.data().content,
-          username: doc.data().username,
-          userId: doc.data().userId,
-          imageUrl: doc.data().imageUrl,
-          createdAt: doc.data().createdAt,
-          uploadUrl: doc.data().uploadUrl,
-          contentType: doc.data().contentType,
-          isActive: doc.data().isActive,
-          likeCount: doc.data().likeCount,
-          commentCount: doc.data().commentCount,
-          viewsCount: doc.data().viewsCount,
-          resourceType: doc.data().resourceType,
-        });
+        //   title: doc.data().title,
+        //   shortDescription: doc.data().shortDescription,
+        //   slug: doc.data().slug,
+        //   content: doc.data().content,
+        //   username: doc.data().username,
+        //   userId: doc.data().userId,
+        //   imageUrl: doc.data().imageUrl,
+        //   createdAt: doc.data().createdAt,
+        //   uploadUrl: doc.data().uploadUrl,
+        //   contentType: doc.data().contentType,
+        //   isActive: doc.data().isActive,
+        //   likeCount: doc.data().likeCount,
+        //   commentCount: doc.data().commentCount,
+        //   viewsCount: doc.data().viewsCount,
+        //   resourceType: doc.data().resourceType,
+          }
+        );
         
       });
       
@@ -146,6 +152,7 @@ exports.createResource = (req, res) => {
       viewsCount: 0,
       resourceType: req.body.resourceType,
       pageUrl: `resources/${slug}`,
+      state: 'draft',
       //registerLink: req.body.registerLink || ''
     };
 
@@ -258,12 +265,14 @@ exports.createResource = (req, res) => {
       newResource.commentCount = 0
       newResource.viewsCount = 0
       newResource.pageUrl = `resources/${slug}`
-      db.collection('resources')
+      newResource.state = 'draft'
+      db
+        .collection('resources')
         .add(newResource)
         .then((doc) => {
           resResource = newResource;
           resResource.timelineId = doc.id;
-          docId = doc.id
+          docId = doc.id;
         })
         .then(async () => {
           await db.doc(`mobile timeline/${docId}`).set(resResource);
@@ -439,7 +448,9 @@ exports.likeResource = (req, res) => {
             }
             mobTimelineData = doc.data();
             mobTimelineData.likeCount++;
-            return mobUploadDoc.update({ likeCount: mobTimelineData.likeCount });
+            return mobTimelineDoc.update({
+              likeCount: mobTimelineData.likeCount,
+            });
           })
           .then(() => {
             return res.json(resourceData);
@@ -497,7 +508,9 @@ exports.unLikeResource = (req, res) => {
             }
             mobTimelineData = doc.data();
             mobTimelineData.likeCount--;
-            return mobUploadDoc.update({ likeCount: mobTimelineData.likeCount });
+            return mobTimelineDoc.update({
+              likeCount: mobTimelineData.likeCount,
+            });
           })
           .then(() => {
             res.json(resourceData);
@@ -509,6 +522,7 @@ exports.unLikeResource = (req, res) => {
       res.status(500).json({ error: err.code });
     });
 };
+
 
 // Delete a resource
 exports.deleteResource = (req, res) => {
@@ -530,6 +544,7 @@ exports.deleteResource = (req, res) => {
       return res.status(500).json({ error: err.code });
     });
 };
+
 
 // Update resource data
 exports.updateResource = (req, res) => {

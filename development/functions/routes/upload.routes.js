@@ -28,5 +28,9 @@ router.route('/user-upload/:uploadId/unlike')
 router.route('/upload-meta')
   .post(FBAuth.protect, uploadHelper.uploadMetaData)
 
+router
+  .route('/user-audio-upload')
+  .post(uploadHelper.addNewAudioFile);
+
 
 module.exports = router;

@@ -590,74 +590,63 @@ exports.onUserDataChange = functions
   .onUpdate((change) => {
     const newData = change.after.data();
     const oldData = change.before.data();
-    // const newUserName = newData.username
+    const userId = change.before.data().userId;
+    const cvDoc = db.doc(`users/${userId}/digital-cv/${userId}`);
 
-    // if (oldData.imageUrl !== newData.imageUrl) {
-    //   return db
-    //         .doc(`/notifications/${snapshot.id}`)
-    //         .set({
-    //           createdAt: new Date().toISOString(),
-    //           message: `Your profile pic has been updated.`,
-    //           type: 'Profile Image',
-    //           read: false,
-    //           recipient: snapshot.data().userId,
-    //           sender: 'levls',
-    //           avatar: '',
-    //           notificationId: snapshot.id
-    //         })
-    // }
-
-    // if (oldData.username !== newData.username) {
-    //   return db
-    //         .doc(`/notifications/${snapshot.id}`)
-    //         .set({
-    //           createdAt: new Date().toISOString(),
-    //           message: `your username has been change to ${newUserName}
-    //           If this wasn't you please contact us.`,
-    //           type: 'username',
-    //           read: false,
-    //           recipient: snapshot.data().userId,
-    //           sender: 'levls',
-    //           avatar: '',
-    //           notificationId: snapshot.id
-    //         })
-    // }
-    // else {
-    //   return db.collection('notifications').add({
-    //     createdAt: new Date().toISOString(),
-    //     message: 'Your details have been updated',
-    //     type: 'Details Update',
-    //     read: false,
-    //     recipient: change.before.data().userId,
-    //     sender: 'levls',
-    //     avatar: ''
-    //   })
-    // }
-    if (
-      oldData.username !== newData.username ||
-      oldData.imageUrl !== newData.imageUrl ||
-      oldData.followersCount !== newData.followersCount ||
-      oldData.followingCount !== newData.followingCount
-    ) {
-      return true;
-    } else {
-      return db.collection('notifications').add({
-        createdAt: new Date().toISOString(),
-        message: 'Your details have been updated',
-        type: 'details update',
-        read: false,
-        recipient: change.before.data().userId,
-        sender: 'levls',
-        avatar: '',
+    cvDoc
+      .get()
+      .then(async (doc) => {
+        if (doc.exists) {
+          switch (
+            oldData.occupation !== newData.occupation ||
+            oldData.firstName !== newData.firstName ||
+            oldData.lastName !== newData.lastName ||
+            oldData.isCvPrivate !== newData.isCvPrivate
+          ) {
+            case oldData.occupation !== newData.occupation:
+              cvDoc.update({ occupation: newData.occupation });
+            // break;
+            case oldData.firstName !== newData.firstName:
+              cvDoc.update({ firstName: newData.firstName });
+            // break;
+            case oldData.lastName !== newData.lastName:
+              cvDoc.update({ lastName: newData.lastName });
+            // break;
+            case oldData.lastName !== newData.lastName:
+              cvDoc.update({ lastName: newData.lastName });
+            // break;
+            case oldData.isCvPrivate !== newData.isCvPrivate:
+              cvDoc.update({ isCvPrivate: newData.isCvPrivate });
+            // break;
+            default:
+              cvDoc.update({ updatedAt: new Date().toISOString() });
+              break;
+          }
+        } else {
+          return db.doc(`users/${userId}/digital-cv/${userId}`).set({
+            createdAt: new Date().toISOString(),
+            firstName: newData.firstName,
+            lastName: newData.lastName,
+            occupation: newData.firstName,
+            imageUrl: newData.imageUrl,
+            isCvPrivate: true,
+            bio: newData.bio,
+            profileVideo: '',
+            contentType: 'personal',
+          });
+        }
+      })
+      .catch((err) => {
+        console.error(err);
       });
-    }
+
   });
 
 // Delete a user
 exports.onDeleteUser = functions
   .region('europe-west2')
   .firestore.document('/users/{userId}')
-  .onDelete((snap, context) => {
+  .onDelete((snap, _context) => {
     const data = snap.data();
     const decrement = admin.firestore.FieldValue.increment(-1);
     const activeUsersRef = db.collection('site stats').doc('active-users');

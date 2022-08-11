@@ -108,6 +108,7 @@ exports.createAGrant = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'grants',
       isActive: false,
+      state: 'draft',
       applicantCount: 0,
       pageUrl: `grants/${req.body.grantType.toLowerCase()}/${slug}`,
     };

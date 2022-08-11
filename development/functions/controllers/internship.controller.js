@@ -94,6 +94,7 @@ exports.createAnInternship = (req, res) => {
       deadline: req.body.deadline || '',
       applicationLink: req.body.applicationLink || '',
       howtoApply: req.body.howtoApply || '',
+      customQuestions: req.body.customQuestions,
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
       username: req.user.username,
@@ -102,6 +103,7 @@ exports.createAnInternship = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'internship',
       isActive: false,
+      state: 'draft',
       applicantCount: 0,
       pageUrl: `internship/${req.body.jobType.toLowerCase()}/${slug}`,
     };

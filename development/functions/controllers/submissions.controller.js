@@ -1,3 +1,4 @@
+
 exports.submitGrantApplication = (req, res) => {
 
     const BusBoy = require("busboy");
@@ -163,4 +164,155 @@ exports.submitGrantApplication = (req, res) => {
       busboy.end(req.rawBody);
     }
     
+};
+
+
+exports.submitApplication = (req, res) => {
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+
+  const busboy = new BusBoy({ headers: req.headers });
+
+  const grantDocument = db.doc(`grants/${req.params.grantId}`);
+  let grantData;
+  const grantId = req.params.grantId;
+  const userId = req.user.userId;
+  const username = req.user.username;
+  const imageUrl = req.user.imageUrl;
+
+  let imagesToBeUploaded = [];
+  let imageFileName = {};
+  let generatedToken = uuid();
+  let imageToAdd = {};
+  let uploadUrls = [];
+  let newAppilcation = {};
+  let grantHostUserId;
+  let grantTitle;
+  let grantType;
+
+  busboy.on(
+    'field',
+    function (
+      fieldname,
+      val,
+      _fieldnameTruncated,
+      _valTruncated,
+      _encoding,
+      _mimetype
+    ) {
+      newAppilcation[fieldname] = val;
+    }
+  );
+
+  busboy.on('file', (_fieldname, file, filename, _encoding, mimetype) => {
+    if (
+      mimetype !== 'image/jpeg' &&
+      mimetype !== 'image/jpg' &&
+      mimetype !== 'image/png' &&
+      mimetype !== 'video/mp4' &&
+      mimetype !== 'video/swf' &&
+      mimetype !== 'application/msword' &&
+      mimetype !== 'application/pdf' &&
+      mimetype !== 'text/csv' &&
+      mimetype !== 'video/mpeg' &&
+      mimetype !==
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ) {
+      return res.status(400).json({ error: 'Wrong file type submitted' });
+    }
+    const imageExtension = filename.split('.')[filename.split('.').length - 1];
+    // 32756238461724837.png
+    imageFileName = `${Math.round(
+      Math.random() * 1000000000000
+    ).toString()}.${imageExtension}`;
+    const filepath = path.join(os.tmpdir(), path.basename(imageFileName));
+    imageToAdd = {
+      imageFileName,
+      filepath,
+      mimetype,
+    };
+    file.pipe(fs.createWriteStream(filepath));
+    imagesToBeUploaded.push(imageToAdd);
+  });
+
+  busboy.on('finish', async () => {
+    let promises = [];
+
+    imagesToBeUploaded.forEach((imageToBeUploaded) => {
+      uploadUrls.push(
+        `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/application-uploads%2F${imagesToBeUploaded.imageFileName}?alt=media&token=${generatedToken}`
+      );
+
+      promises.push(
+        admin
+          .storage()
+          .bucket()
+          .upload(imageToBeUploaded.filepath, {
+            destination: `application-uploads/${imageFileName}`,
+            resumable: false,
+            metadata: {
+              metadata: {
+                contentType: imageToBeUploaded.mimetype,
+                //Generate token to be appended to imageUrl
+                firebaseStorageDownloadTokens: generatedToken,
+              },
+            },
+          })
+      );
+    });
+
+    try {
+      await Promise.all(promises);
+      grantDocument
+        .get()
+        .then((doc) => {
+          if (doc.exists) {
+            grantData = doc.data();
+            grantData.grantId = doc.id;
+            grantHostUserId = grantData.userId;
+            grantTitle = grantData.title;
+            grantType = grantData.grantType;
+          } else {
+            return res.status(404).json({ error: 'Grant details not found' });
+          }
+        })
+        .then(() => {
+          const uploadUrl = uploadUrls;
+          newAppilcation.uploadUrl = uploadUrl;
+          newAppilcation.applicantUserId = userId;
+          newAppilcation.applicantUsername = username;
+          newAppilcation.applicantImageUrl = imageUrl;
+          newAppilcation.applicationType = 'funding';
+          newAppilcation.grantId = grantId;
+          newAppilcation.createdAt = new Date().toISOString();
+          newAppilcation.grantHostUserId = grantHostUserId;
+          newAppilcation.grantTitle = grantTitle;
+          newAppilcation.grantType = grantType;
+
+          db.doc(`grants/${req.params.grantId}/submissions/${userId}`)
+            .set(newAppilcation)
+            .then(() => {
+              grantData.applicantCount++;
+              return grantDocument.update({
+                applicantCount: grantData.applicantCount,
+              });
+            })
+            .catch((err) => {
+              res.status(500).json({ error: 'something went wrong' });
+              console.error(err);
+            });
+        });
+
+      return res.status(200).json({
+        success: `Uploads URL: ${uploadUrls}`,
+      });
+    } catch (err) {
+      console.log(err);
+      res.status(500).json(err);
+    }
+  });
+
+  busboy.end(req.rawBody);
 };

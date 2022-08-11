@@ -8,6 +8,8 @@ router.route('/events')
     .get(eventHelper.getAllEvents)
     .post(FBAuth.protect, eventHelper.createEvent)
 
+router.route('/events/:userId').get(eventHelper.getAllOrgEvents);
+
 router.route('/event/:slug').get(eventHelper.getEvent);
 
 router

@@ -1,10 +1,9 @@
-const functions = require("firebase-functions");
+const functions = require('firebase-functions');
 const { db, admin } = require('../utils/admin');
-const sgMail = require('@sendgrid/mail')
+const sgMail = require('@sendgrid/mail');
 const config = require('../utils/database');
 const { addToSendgrid } = require('../lib');
 const request = require('request');
-
 
 exports.verifyEmail = functions
   .region('europe-west2')
@@ -64,11 +63,10 @@ exports.addUserToSendgrid = functions
       };
       try {
         const response = await addToSendgrid(data);
-        console.log(response)
-      } catch(err) {
-        console.log(err)
+        console.log(response);
+      } catch (err) {
+        console.log(err);
       }
-      
     } else {
       const data = {
         list_ids: ['e5ad3bb1-b361-47de-9fa3-a900234ed6f0'],
@@ -94,59 +92,65 @@ exports.addUserToSendgrid = functions
         console.log(err);
       }
     }
-    
   });
 
 exports.welcomeEmail = functions
   .region('europe-west2')
   .firestore.document('users/{id}')
-  .onUpdate( async (change, _ctx) => {
-    const newData = change.after.data()
-    const oldData = change.before.data()
+  .onUpdate(async (change, _ctx) => {
+    const newData = change.after.data();
+    const oldData = change.before.data();
     const increment = admin.firestore.FieldValue.increment(1);
     const decrement = admin.firestore.FieldValue.increment(-1);
-    const activeUsersRef = db.collection("site stats").doc("active-users")
-    const inActiveUsersRef = db.collection("site stats").doc("inactive-users")
-    const verifiedUsersRef = db.collection("site stats").doc("verified-users")
+    const activeUsersRef = db.collection('site stats').doc('active-users');
+    const inActiveUsersRef = db.collection('site stats').doc('inactive-users');
+    const verifiedUsersRef = db.collection('site stats').doc('verified-users');
     const batch = db.batch();
     const msg = {
       to: `${newData.email}`, // recipient
       from: 'LEVLS. <noreply@levls.io>', // Change to verified sender
       template_id: 'd-c6f168fa8a394bc7b11699c29b868b01',
     };
-    if (oldData.verified !== newData.verified) {      
+    if (oldData.verified !== newData.verified) {
       await sgMail
-      .send(msg)
-      .then(() => {
-        console.log('Email sent')
-        db.doc(`/notifications/${newData.userId}`).set({
-          createdAt: new Date().toISOString(),
-          recipient: newData.userId,
-          message: `Welcome to the community ${newData.username}.`,
-          type: 'welcome email',
-          read: false,
+        .send(msg)
+        .then(() => {
+          console.log('Email sent');
+          db.doc(`/notifications/${newData.userId}`).set({
+            createdAt: new Date().toISOString(),
+            recipient: newData.userId,
+            message: `Welcome to the community ${newData.username}.`,
+            type: 'welcome email',
+            read: false,
+          });
         })
-      })
-      .then(() => {
-        batch.set(verifiedUsersRef, { totalCount: increment }, { merge: true });
-        batch.set(activeUsersRef, { totalCount: increment }, { merge: true });
-        batch.set(inActiveUsersRef, { totalCount: decrement }, { merge: true });
-        return batch.commit();
-      })
-      .catch((error) => {
-        console.log(`Sending the welcome mail produced this error: ${error}`);
-      })
+        .then(() => {
+          batch.set(
+            verifiedUsersRef,
+            { totalCount: increment },
+            { merge: true }
+          );
+          batch.set(activeUsersRef, { totalCount: increment }, { merge: true });
+          batch.set(
+            inActiveUsersRef,
+            { totalCount: decrement },
+            { merge: true }
+          );
+          return batch.commit();
+        })
+        .catch((error) => {
+          console.log(`Sending the welcome mail produced this error: ${error}`);
+        });
     } else return null;
-    
-  })
+  });
 
 // Username update
 exports.userNameChangeNotification = functions
   .region('europe-west2')
   .firestore.document('users/{id}')
   .onUpdate((change) => {
-    const newUserName = change.after.data().username
-    const userId = change.before.data().userId
+    const newUserName = change.after.data().username;
+    const userId = change.before.data().userId;
     if (change.before.data().username !== change.after.data().username) {
       const batch = db.batch();
       return db
@@ -166,8 +170,10 @@ exports.userNameChangeNotification = functions
         .then((data) => {
           data.forEach((doc) => {
             const follow = db.doc(`followers/${doc.id}`);
-            batch.update(follow, { followerUsername: change.after.data().username });
-          })
+            batch.update(follow, {
+              followerUsername: change.after.data().username,
+            });
+          });
           return db
             .collection('likes')
             .where('username', '==', change.before.data().username)
@@ -177,7 +183,7 @@ exports.userNameChangeNotification = functions
           data.forEach((doc) => {
             const like = db.doc(`likes/${doc.id}`);
             batch.update(like, { username: change.after.data().username });
-          })
+          });
           return db
             .collection('projects')
             .where('username', '==', change.before.data().username)
@@ -187,7 +193,7 @@ exports.userNameChangeNotification = functions
           data.forEach((doc) => {
             const project = db.doc(`projects/${doc.id}`);
             batch.update(project, { username: change.after.data().username });
-          })
+          });
           return db
             .collection('apprenticeships')
             .where('username', '==', change.before.data().username)
@@ -196,8 +202,10 @@ exports.userNameChangeNotification = functions
         .then((data) => {
           data.forEach((doc) => {
             const apprentice = db.doc(`apprenticeships/${doc.id}`);
-            batch.update(apprentice, { username: change.after.data().username });
-          })
+            batch.update(apprentice, {
+              username: change.after.data().username,
+            });
+          });
           return db
             .collection('opportunities')
             .where('username', '==', change.before.data().username)
@@ -206,19 +214,20 @@ exports.userNameChangeNotification = functions
         .then((data) => {
           data.forEach((doc) => {
             const opportunities = db.doc(`opportunities/${doc.id}`);
-            batch.update(opportunities, { username: change.after.data().username });
-          })
+            batch.update(opportunities, {
+              username: change.after.data().username,
+            });
+          });
           return db
             .collection('events')
             .where('username', '==', change.before.data().username)
             .get();
-
         })
         .then((data) => {
           data.forEach((doc) => {
             const event = db.doc(`events/${doc.id}`);
             batch.update(event, { username: change.after.data().username });
-          })
+          });
           return db
             .collection('articles')
             .where('username', '==', change.before.data().username)
@@ -228,7 +237,7 @@ exports.userNameChangeNotification = functions
           data.forEach((doc) => {
             const article = db.doc(`articles/${doc.id}`);
             batch.update(article, { username: change.after.data().username });
-          })
+          });
           return db
             .collection('comments')
             .where('username', '==', change.before.data().username)
@@ -238,7 +247,7 @@ exports.userNameChangeNotification = functions
           data.forEach((doc) => {
             const comment = db.doc(`comments/${doc.id}`);
             batch.update(comment, { username: change.after.data().username });
-          })
+          });
           return db
             .collection('grants')
             .where('username', '==', change.before.data().username)
@@ -248,7 +257,7 @@ exports.userNameChangeNotification = functions
           data.forEach((doc) => {
             const grant = db.doc(`grants/${doc.id}`);
             batch.update(grant, { username: change.after.data().username });
-          })
+          });
           return db
             .collection('internships')
             .where('username', '==', change.before.data().username)
@@ -257,8 +266,10 @@ exports.userNameChangeNotification = functions
         .then((data) => {
           data.forEach((doc) => {
             const internship = db.doc(`internships/${doc.id}`);
-            batch.update(internship, { username: change.after.data().username });
-          })
+            batch.update(internship, {
+              username: change.after.data().username,
+            });
+          });
           return db
             .collection('news')
             .where('username', '==', change.before.data().username)
@@ -268,7 +279,7 @@ exports.userNameChangeNotification = functions
           data.forEach((doc) => {
             const post = db.doc(`news/${doc.id}`);
             batch.update(post, { username: change.after.data().username });
-          })
+          });
           return db
             .collection('resources')
             .where('username', '==', change.before.data().username)
@@ -278,7 +289,7 @@ exports.userNameChangeNotification = functions
           data.forEach((doc) => {
             const resource = db.doc(`resources/${doc.id}`);
             batch.update(resource, { username: change.after.data().username });
-          })
+          });
           return db
             .collection('notifications')
             .where('username', '==', change.before.data().username)
@@ -287,8 +298,10 @@ exports.userNameChangeNotification = functions
         .then((data) => {
           data.forEach((doc) => {
             const notification = db.doc(`notifications/${doc.id}`);
-            batch.update(notification, { username: change.after.data().username });
-          })
+            batch.update(notification, {
+              username: change.after.data().username,
+            });
+          });
           return db
             .collection('mobile timeline')
             .where('username', '==', change.before.data().username)
@@ -298,7 +311,7 @@ exports.userNameChangeNotification = functions
           data.forEach((doc) => {
             const timeline = db.doc(`mobile timeline/${doc.id}`);
             batch.update(timeline, { username: change.after.data().username });
-          })
+          });
           return db
             .collection(`/users/${userId}/followings`)
             .where('followedUserUsername', '==', change.before.data().username)
@@ -307,20 +320,22 @@ exports.userNameChangeNotification = functions
         .then((data) => {
           data.forEach((doc) => {
             const following = db.doc(`users/${userId}/followings/${doc.id}`);
-            batch.update(following, { followedUserUsername: change.after.data().username });
-          })
+            batch.update(following, {
+              followedUserUsername: change.after.data().username,
+            });
+          });
           return db
             .collection(`jobs`)
             .where('username', '==', change.before.data().username)
             .get();
         })
-        .then(async(data) => {
+        .then(async (data) => {
           data.forEach((doc) => {
             const job = db.doc(`jobs/${doc.id}`);
             batch.update(job, { username: change.after.data().username });
           });
         })
-        .then(async() => {
+        .then(async () => {
           await batch.commit();
           return db.collection('notifications').add({
             createdAt: new Date().toISOString(),
@@ -332,11 +347,11 @@ exports.userNameChangeNotification = functions
             sender: 'levls',
             avatar: '',
             notificationId: change.before.data().userId,
-          }); 
+          });
         })
         .catch((err) => console.error(err));
-    }  else return null; 
-})
+    } else return null;
+  });
 
 // New follower
 exports.createNotificationForNewfollower = functions
@@ -362,36 +377,34 @@ exports.createNotificationForNewfollower = functions
             userId: doc.id,
             avatar: snapshot.data().followerImageUrl,
             message: `${snapshot.data().followerUsername} is following you.`,
-            notifications: snapshot.id
+            notifications: snapshot.id,
           });
         }
       })
       .catch((err) => console.error(err));
-});
+  });
 
 //Delete follower notification when user is unfollowed.
 exports.deleteNotificationOnUnfollow = functions
   .region('europe-west2')
   .firestore.document('followers/{id}')
-  .onDelete(async(snapshot, _context) => {
+  .onDelete(async (snapshot, _context) => {
     return db
       .doc(`/notifications/${snapshot.id}`)
       .delete()
       .catch((err) => {
         console.error(err);
       });
-})
+  });
 
 // User image update
 exports.onUserImageChange = functions
   .region('europe-west2')
   .firestore.document('/users/{userId}')
-  .onUpdate((change) => {
-
-    const userId = change.before.data().userId
+  .onUpdate(async (change) => {
+    const userId = change.before.data().userId;
 
     if (change.before.data().imageUrl !== change.after.data().imageUrl) {
-
       const batch = db.batch();
       return db
         .collection('uploads')
@@ -410,8 +423,10 @@ exports.onUserImageChange = functions
         .then((data) => {
           data.forEach((doc) => {
             const follow = db.doc(`followers/${doc.id}`);
-            batch.update(follow, { followerImageUrl: change.after.data().imageUrl });
-          })
+            batch.update(follow, {
+              followerImageUrl: change.after.data().imageUrl,
+            });
+          });
           return db
             .collection('likes')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -421,7 +436,7 @@ exports.onUserImageChange = functions
           data.forEach((doc) => {
             const like = db.doc(`likes/${doc.id}`);
             batch.update(like, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection('projects')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -431,7 +446,7 @@ exports.onUserImageChange = functions
           data.forEach((doc) => {
             const project = db.doc(`projects/${doc.id}`);
             batch.update(project, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection('apprenticeships')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -440,8 +455,10 @@ exports.onUserImageChange = functions
         .then((data) => {
           data.forEach((doc) => {
             const apprentice = db.doc(`apprenticeships/${doc.id}`);
-            batch.update(apprentice, { imageUrl: change.after.data().imageUrl });
-          })
+            batch.update(apprentice, {
+              imageUrl: change.after.data().imageUrl,
+            });
+          });
           return db
             .collection('opportunities')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -450,19 +467,20 @@ exports.onUserImageChange = functions
         .then((data) => {
           data.forEach((doc) => {
             const opportunities = db.doc(`opportunities/${doc.id}`);
-            batch.update(opportunities, { imageUrl: change.after.data().imageUrl });
-          })
+            batch.update(opportunities, {
+              imageUrl: change.after.data().imageUrl,
+            });
+          });
           return db
             .collection('events')
             .where('imageUrl', '==', change.before.data().imageUrl)
             .get();
-
         })
         .then((data) => {
           data.forEach((doc) => {
             const event = db.doc(`events/${doc.id}`);
             batch.update(event, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection('articles')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -472,7 +490,7 @@ exports.onUserImageChange = functions
           data.forEach((doc) => {
             const article = db.doc(`articles/${doc.id}`);
             batch.update(article, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection('comments')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -482,7 +500,7 @@ exports.onUserImageChange = functions
           data.forEach((doc) => {
             const comment = db.doc(`comments/${doc.id}`);
             batch.update(comment, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection('grants')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -492,7 +510,7 @@ exports.onUserImageChange = functions
           data.forEach((doc) => {
             const grant = db.doc(`grants/${doc.id}`);
             batch.update(grant, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection('internships')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -501,8 +519,10 @@ exports.onUserImageChange = functions
         .then((data) => {
           data.forEach((doc) => {
             const internship = db.doc(`internships/${doc.id}`);
-            batch.update(internship, { imageUrl: change.after.data().imageUrl });
-          })
+            batch.update(internship, {
+              imageUrl: change.after.data().imageUrl,
+            });
+          });
           return db
             .collection('news')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -512,7 +532,7 @@ exports.onUserImageChange = functions
           data.forEach((doc) => {
             const post = db.doc(`news/${doc.id}`);
             batch.update(post, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection('resources')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -522,7 +542,7 @@ exports.onUserImageChange = functions
           data.forEach((doc) => {
             const resource = db.doc(`resources/${doc.id}`);
             batch.update(resource, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection('notifications')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -531,8 +551,10 @@ exports.onUserImageChange = functions
         .then((data) => {
           data.forEach((doc) => {
             const notification = db.doc(`notifications/${doc.id}`);
-            batch.update(notification, { imageUrl: change.after.data().imageUrl });
-          })
+            batch.update(notification, {
+              imageUrl: change.after.data().imageUrl,
+            });
+          });
           return db
             .collection('mobile timeline')
             .where('imageUrl', '==', change.before.data().imageUrl)
@@ -542,7 +564,7 @@ exports.onUserImageChange = functions
           data.forEach((doc) => {
             const timeline = db.doc(`mobile timeline/${doc.id}`);
             batch.update(timeline, { imageUrl: change.after.data().imageUrl });
-          })
+          });
           return db
             .collection(`/users/${userId}/followings`)
             .where('followedUserImageUrl', '==', change.before.data().imageUrl)
@@ -551,8 +573,10 @@ exports.onUserImageChange = functions
         .then((data) => {
           data.forEach((doc) => {
             const following = db.doc(`users/${userId}/followings/${doc.id}`);
-            batch.update(following, { followedUserImageUrl: change.after.data().imageUrl });
-          })
+            batch.update(following, {
+              followedUserImageUrl: change.after.data().imageUrl,
+            });
+          });
           return db.collection('notifications').add({
             createdAt: new Date().toISOString(),
             message: `your image has been updated
@@ -570,76 +594,84 @@ exports.onUserImageChange = functions
         })
         .catch((err) => console.error(err));
     } else return null;
-});
+  });
 
 // Update other details
 exports.onUserDataChange = functions
   .region('europe-west2')
   .firestore.document('/users/{userId}')
-  .onUpdate((change) => {
+  .onUpdate(async (change) => {
     const newData = change.after.data();
     const oldData = change.before.data();
+    const userId = change.before.data().userId;
     // const newUserName = newData.username
+    const cvDoc = db.doc(`users/${userId}/digital-cv/${userId}`);
 
-    // if (oldData.imageUrl !== newData.imageUrl) {
-    //   return db
-    //         .doc(`/notifications/${snapshot.id}`)
-    //         .set({
-    //           createdAt: new Date().toISOString(),
-    //           message: `Your profile pic has been updated.`,
-    //           type: 'Profile Image',
-    //           read: false,
-    //           recipient: snapshot.data().userId,
-    //           sender: 'levls',
-    //           avatar: '',
-    //           notificationId: snapshot.id
-    //         })
-    // }
+    cvDoc
+      .get()
+      .then(async (doc) => {
+        if (doc.exists) {
+          switch (
+            oldData.occupation !== newData.occupation ||
+            oldData.firstName !== newData.firstName ||
+            oldData.lastName !== newData.lastName ||
+            oldData.isCvPrivate !== newData.isCvPrivate
+          ) {
+            case oldData.occupation !== newData.occupation:
+              cvDoc.update({ occupation: newData.occupation });
+              // break;
+            case oldData.firstName !== newData.firstName:
+              cvDoc.update({ firstName: newData.firstName });
+              // break;
+            case oldData.lastName !== newData.lastName:
+              cvDoc.update({ lastName: newData.lastName });
+              // break;
+            case oldData.lastName !== newData.lastName:
+              cvDoc.update({ lastName: newData.lastName });
+              // break;
+            case oldData.isCvPrivate !== newData.isCvPrivate:
+              cvDoc.update({ isCvPrivate: newData.isCvPrivate });
+              // break;
+            default:
+              cvDoc.update({ updatedAt: new Date().toISOString() });
+              break;
+          }
+        } else {
+          return db.doc(`users/${userId}/digital-cv/${userId}`).set({
+            createdAt: new Date().toISOString(),
+            firstName: newData.firstName,
+            lastName: newData.lastName,
+            occupation: newData.firstName,
+            imageUrl: newData.imageUrl,
+            isCvPrivate: true,
+            bio: newData.bio,
+            profileVideo: '',
+            contentType: 'personal',
+          });
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+      });
 
-    // if (oldData.username !== newData.username) {
-    //   return db
-    //         .doc(`/notifications/${snapshot.id}`)
-    //         .set({
-    //           createdAt: new Date().toISOString(),
-    //           message: `your username has been change to ${newUserName}
-    //           If this wasn't you please contact us.`,
-    //           type: 'username',
-    //           read: false,
-    //           recipient: snapshot.data().userId,
-    //           sender: 'levls',
-    //           avatar: '',
-    //           notificationId: snapshot.id
-    //         })
-    // }
-    // else {
+    // if (
+    //   oldData.username !== newData.username ||
+    //   oldData.imageUrl !== newData.imageUrl ||
+    //   oldData.followersCount !== newData.followersCount ||
+    //   oldData.followingCount !== newData.followingCount
+    // ) {
+    //   return true;
+    // } else {
     //   return db.collection('notifications').add({
     //     createdAt: new Date().toISOString(),
     //     message: 'Your details have been updated',
-    //     type: 'Details Update',
+    //     type: 'details update',
     //     read: false,
     //     recipient: change.before.data().userId,
     //     sender: 'levls',
-    //     avatar: ''
-    //   })
+    //     avatar: '',
+    //   });
     // }
-    if (
-      oldData.username !== newData.username ||
-      oldData.imageUrl !== newData.imageUrl ||
-      oldData.followersCount !== newData.followersCount ||
-      oldData.followingCount !== newData.followingCount
-    ) {
-      return true;
-    } else {
-      return db.collection('notifications').add({
-        createdAt: new Date().toISOString(),
-        message: 'Your details have been updated',
-        type: 'details update',
-        read: false,
-        recipient: change.before.data().userId,
-        sender: 'levls',
-        avatar: '',
-      });
-    }
   });
 
 // Delete a user
@@ -647,21 +679,21 @@ exports.onDeleteUser = functions
   .region('europe-west2')
   .firestore.document('/users/{userId}')
   .onDelete((snap, _context) => {
-    const data = snap.data()
+    const data = snap.data();
     const decrement = admin.firestore.FieldValue.increment(-1);
-    const activeUsersRef = db.collection("site stats").doc("active-users")
-    const inActiveUsersRef = db.collection("site stats").doc("inactive-users")
-    const verifiedUsersRef = db.collection("site stats").doc("verified-users")
-    const totalUsersRef = db.collection("site stats").doc("all-users")
-    const usernameRef = db.doc(`usernames/${data.username}`)
+    const activeUsersRef = db.collection('site stats').doc('active-users');
+    const inActiveUsersRef = db.collection('site stats').doc('inactive-users');
+    const verifiedUsersRef = db.collection('site stats').doc('verified-users');
+    const totalUsersRef = db.collection('site stats').doc('all-users');
+    const usernameRef = db.doc(`usernames/${data.username}`);
     const batch = db.batch();
-    
+
     usernameRef.delete();
     batch.set(totalUsersRef, { totalCount: decrement }, { merge: true });
 
     if (data.isActive === false) {
       batch.set(inActiveUsersRef, { totalCount: decrement }, { merge: true });
-    } else { 
+    } else {
       batch.set(activeUsersRef, { totalCount: decrement }, { merge: true });
     }
 
@@ -669,4 +701,4 @@ exports.onDeleteUser = functions
       batch.set(verifiedUsersRef, { totalCount: decrement }, { merge: true });
     }
     return batch.commit();
-  })
+  });

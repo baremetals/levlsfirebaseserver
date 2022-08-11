@@ -52,7 +52,7 @@ exports.projectActiveNotification = functions
 exports.commentProjectNotification = functions
   .region('europe-west2')
   .firestore.document('comments/{id}')
-  .onCreate((snapshot) => {
+  .onCreate(async (snapshot) => {
     const username = snapshot.data().username
     const imageUrl = snapshot.data().imageUrl
     const caption = snapshot.data().caption
@@ -87,11 +87,12 @@ exports.commentProjectNotification = functions
 exports.deleteProjectCommentNotification = functions
   .region('europe-west2')
   .firestore.document('comments/{id}')
-  .onDelete((snapshot) => {
+  .onDelete(async (snapshot) => {
     return db
       .doc(`/notifications/${snapshot.id}`)
       .delete()
       .catch((err) => {
+        console.error(err);
       });
 })
 
@@ -99,7 +100,7 @@ exports.deleteProjectCommentNotification = functions
 exports.likeProjectNotification = functions
   .region('europe-west2')
   .firestore.document('likes/{id}')
-  .onCreate((snapshot) => {
+  .onCreate(async (snapshot) => {
     return db
       .doc(`/projects/${snapshot.data().projectId}`)
       .get()
@@ -128,7 +129,7 @@ exports.likeProjectNotification = functions
 exports.deleteProjectLikeNotification = functions
   .region('europe-west2')
   .firestore.document('likes/{id}')
-  .onDelete((snapshot) => {
+  .onDelete(async (snapshot) => {
     return db
       .doc(`/notifications/${snapshot.id}`)
       .delete()
@@ -141,7 +142,7 @@ exports.deleteProjectLikeNotification = functions
 exports.onProjectDelete = functions
   .region('europe-west2')
   .firestore.document('projects/{projectId}')
-  .onDelete((snapshot, context) => {
+  .onDelete(async (snapshot, _context) => {
     const projectId = snapshot.id;
     const batch = db.batch();
     return db

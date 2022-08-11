@@ -32,6 +32,7 @@ const {
   logout,
   getDigitalCV,
   getMyDigitalCV,
+  addProfileVideo,
 } = require('../controllers/user.controller');
 
 const router = express.Router();
@@ -101,7 +102,8 @@ router.route('/comment/:commentId').post(FBAuth.protect, editComment);
 
 router.route('/update-user-profile-url').get(addProfileUrlToAllUsers);
 
-router.route('/digital-cv/:userId').get(getDigitalCV);
+router.route('/digital-cv/:userId').get(FBAuth.protect, getDigitalCV);
 router.route('/digital-cv').get(FBAuth.protect, getMyDigitalCV);
+router.route('/user/profile-video').post(FBAuth.protect, addProfileVideo);
 
 module.exports = router;

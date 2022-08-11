@@ -12,22 +12,23 @@ exports.getAllPosts = (req, res) => {
       let posts = [];
       data.forEach((doc) => {
         posts.push({
+          ...doc.data(),
           newsId: doc.id,
-          title: doc.data().title,
-          shortDescription: doc.data().shortDescription,
-          slug: doc.data().slug,
-          content: doc.data().content,
-          username: doc.data().username,
-          imageUrl: doc.data().imageUrl,
-          userId: doc.data().userId,
-          createdAt: doc.data().createdAt,
-          uploadUrl: doc.data().uploadUrl,
-          contentType: doc.data().contentType,
-          category: doc.data().category,
-          likeCount: doc.data().likeCount,
-          commentCount: doc.data().commentCount,
-          viewsCount: doc.data().viewsCount,
-          isPartner: doc.data().isPartner,
+          // title: doc.data().title,
+          // shortDescription: doc.data().shortDescription,
+          // slug: doc.data().slug,
+          // content: doc.data().content,
+          // username: doc.data().username,
+          // imageUrl: doc.data().imageUrl,
+          // userId: doc.data().userId,
+          // createdAt: doc.data().createdAt,
+          // uploadUrl: doc.data().uploadUrl,
+          // contentType: doc.data().contentType,
+          // category: doc.data().category,
+          // likeCount: doc.data().likeCount,
+          // commentCount: doc.data().commentCount,
+          // viewsCount: doc.data().viewsCount,
+          // isPartner: doc.data().isPartner,
         });
         
       });
@@ -49,21 +50,22 @@ exports.getAllOrgPosts = (req, res) => {
       let posts = [];
       data.forEach((doc) => {
         posts.push({
+          ...doc.data(),
           newsId: doc.id,
-          title: doc.data().title,
-          shortDescription: doc.data().shortDescription,
-          slug: doc.data().slug,
-          content: doc.data().content,
-          username: doc.data().username,
-          imageUrl: doc.data().imageUrl,
-          userId: doc.data().userId,
-          createdAt: doc.data().createdAt,
-          uploadUrl: doc.data().uploadUrl,
-          contentType: doc.data().contentType,
-          category: doc.data().category,
-          likeCount: doc.data().likeCount,
-          commentCount: doc.data().commentCount,
-          viewsCount: doc.data.viewsCount,
+          // title: doc.data().title,
+          // shortDescription: doc.data().shortDescription,
+          // slug: doc.data().slug,
+          // content: doc.data().content,
+          // username: doc.data().username,
+          // imageUrl: doc.data().imageUrl,
+          // userId: doc.data().userId,
+          // createdAt: doc.data().createdAt,
+          // uploadUrl: doc.data().uploadUrl,
+          // contentType: doc.data().contentType,
+          // category: doc.data().category,
+          // likeCount: doc.data().likeCount,
+          // commentCount: doc.data().commentCount,
+          // viewsCount: doc.data.viewsCount,
         });
         
       });
@@ -145,7 +147,9 @@ exports.createPost = (req, res) => {
       contentType: 'news',
       viewsCount: 0,
       isPartner: req.user.isPartner,
-      pageUrl: `news-articles/${req.category.toLowerCase()}/${slug}`,
+      isActive: false,
+      pageUrl: `news-articles/${req.body.category.toLowerCase()}/${slug}`,
+      state: 'draft',
     };
 
     db.collection('news')
@@ -257,23 +261,25 @@ exports.createPost = (req, res) => {
       newArticle.viewsCount = 0
       newArticle.isPartner = isPartner;
       newArticle.pageUrl = `news-articles/${newArticle.category.toLowerCase()}/${slug}`;
-        db
-          .collection('news')
-          .add(newArticle)
-          .then((doc) => {
-            resArticle = newArticle;
-            resArticle.timelineId = doc.id;
-            docId = doc.id;
-          })
-          .then(async () => {
-            await db.doc(`mobile timeline/${docId}`).set(resArticle);
-            await sgMail.send(adminMsg);
-            return res.status(201).json(resArticle);
-          })
-          .catch((err) => {
-            res.status(500).json({ error: 'something went wrong' });
-            console.error(err);
-          });
+      newArticle.isActive = false;
+      newArticle.state = 'draft'
+      db
+        .collection('news')
+        .add(newArticle)
+        .then((doc) => {
+          resArticle = newArticle;
+          resArticle.timelineId = doc.id;
+          docId = doc.id;
+        })
+        .then(async () => {
+          await db.doc(`mobile timeline/${docId}`).set(resArticle);
+          await sgMail.send(adminMsg);
+          return res.status(201).json(resArticle);
+        })
+        .catch((err) => {
+          res.status(500).json({ error: 'something went wrong' });
+          console.error(err);
+        });
     });
 
     busboy.end(req.rawBody);

@@ -1,6 +1,7 @@
 const { admin, db } = require('../utils/admin');
 const sgMail = require('@sendgrid/mail');
-const { uuid } = require('uuidv4');
+const config = require('../utils/database');
+const { v4 } = require('uuid');
 
 // Fetch all apprenticeships
 exports.getAllApprenticeships = (req, res) => {
@@ -29,6 +30,13 @@ exports.getAllApprenticeships = (req, res) => {
           jobType: doc.data().jobType,
           isActive: doc.data().isActive,
           viewsCount: doc.data().viewsCount,
+          state: doc.data().state,
+          educationQuestions: doc.data().educationQuestions,
+          workQuestions: doc.data().workQuestions,
+          additionalQuestions: doc.data().additionalQuestions,
+          salary: doc.data().salary,
+          pageUrl: doc.data().pageUrl,
+          howtoApply: doc.data().howtoApply,
         });
         
       });
@@ -73,7 +81,6 @@ exports.createAnApprenticeship = (req, res) => {
         <p>A new apprenticeship has been created by ${
           req.user.organisationName || req.user.username
         }. Please review and activate </p>
-
         <a href=https://justappli-b9f5c.web.app/admin/apprenticeships/"> Visit </a>
         <p>Thank You.</p>
         <p>LEVLS</p>
@@ -95,8 +102,12 @@ exports.createAnApprenticeship = (req, res) => {
       slug,
       jobType: req.body.jobType,
       location: req.body.location,
+      salary: req.body.salary,
       deadline: req.body.deadline || '',
       howtoApply: req.body.howtoApply,
+      educationQuestions: req.body.educationQuestions,
+      workQuestions: req.body.workQuestions,
+      additionalQuestions: req.body.additionalQuestions,
       applicationLink: req.body.applicationLink || '',
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
@@ -106,6 +117,7 @@ exports.createAnApprenticeship = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'apprenticeship',
       isActive: false,
+      state: req.body.state || 'draft',
       applicantCount: 0,
       pageUrl: `apprenticeship/${req.body.jobType.toLowerCase()}/${slug}`,
     };
@@ -188,7 +200,6 @@ exports.getAnApprenticeship = (req, res) => {
 // };
 
 // Delete a apprenticeship
-
 exports.deleteAnApprenticeship = (req, res) => {
   const document = db.doc(`/apprenticeships/${req.params.apprenticeshipId}`);
   document
@@ -216,12 +227,17 @@ exports.updateAnApprenticeship = (req, res) => {
 
   apprenticeshipDoc
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Apprenticeship not found' });
       }
-      apprenticeshipDoc.update(apprenticeshipDetails)
-      return db.doc(`/opportunities/${req.params.apprenticeshipId}`).update(apprenticeshipDetails);
+      await apprenticeshipDoc.update(apprenticeshipDetails);
+      await db
+        .doc(`/opportunities/${req.params.apprenticeshipId}`)
+        .update(apprenticeshipDetails);
+      await db
+        .doc(`/mobile timeline/${req.params.apprenticeshipId}`)
+        .update(apprenticeshipDetails);
     })
     .then(() => {
       return res.json({ message: "Apprenticeship updated successfully" });
@@ -303,13 +319,13 @@ exports.submitApprenticeCVApplication = (req, res) => {
         const busboy = new BusBoy({ headers: req.headers });
         let imageToBeUploaded = {};
         let imageFileName;
-        let generatedToken = uuid();
+        let generatedToken = v4();
 
         busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
           newApplicant[fieldname] = val
         });
     
-        busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
+        busboy.on("file", (_fieldname, file, filename, encoding, mimetype) => {
           if (mimetype !== "application/msword" && mimetype !== "application/pdf"
               && mimetype !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
             return res.status(400).json({ error: "Wrong file type submitted. Only word and pdf files allowed" });
@@ -379,4 +395,535 @@ exports.submitApprenticeCVApplication = (req, res) => {
     })
 }
 
+exports.submitApprenticeApplication = (req, res) => {
+  const itemCollection = db.collection(
+    `apprenticeships/${req.params.id}/submissions`
+  );
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
 
+  const busboy = new BusBoy({ headers: req.headers });
+
+  const apprenticeshipDocument = db.doc(
+    `apprenticeships/${req.params.id}`
+  );
+
+  itemCollection
+    .doc(req.user.userId)
+    .get()
+    .then((doc) => {
+      if (doc.exists) {
+        return res.status(500).json({
+          error: 'You have already submitted an application',
+        });
+      } else {
+        let apprenticeshipData;
+        const apprenticeshipId = req.params.id;
+        const userId = req.user.userId;
+        const username = req.user.username;
+        const imageUrl = req.user.imageUrl;
+
+        let imagesToBeUploaded = [];
+        let imageFileName = {};
+        let generatedToken = v4();
+        let imageToAdd = {};
+        let uploadUrls = [];
+        let newAppilcation = {};
+        let organisationId;
+        let apprenticeshipTitle;
+        let jobType;
+
+        busboy.on(
+          'field',
+          function (
+            fieldname,
+            val,
+            _fieldnameTruncated,
+            _valTruncated,
+            _encoding,
+            _mimetype
+          ) {
+            newAppilcation[fieldname] = val;
+          }
+        );
+
+        busboy.on('file', (fieldname, file, filename, _encoding, mimetype) => {
+          if (
+            mimetype !== 'image/jpeg' &&
+            mimetype !== 'image/jpg' &&
+            mimetype !== 'image/png' &&
+            mimetype !== 'image/gif' &&
+            mimetype !== 'audio/webm' &&
+            mimetype !== 'audio/mp3' &&
+            mimetype !== 'audio/wav' &&
+            mimetype !== 'video/webm' &&
+            mimetype !== 'video/mp4' &&
+            mimetype !== 'video/swf' &&
+            mimetype !== 'video/mov' &&
+            mimetype !== 'application/msword' &&
+            mimetype !== 'application/pdf' &&
+            mimetype !== 'text/csv' &&
+            mimetype !== 'video/mpeg' &&
+            mimetype !==
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          ) {
+            return res.status(400).json({ error: 'Wrong file type submitted' });
+          }
+          const imageExtension =
+            filename.split('.')[filename.split('.').length - 1];
+          // 32756238461724837.png
+          imageFileName = `${Math.round(
+            Math.random() * 1000000000000
+          ).toString()}.${imageExtension}`;
+          const filepath = path.join(os.tmpdir(), path.basename(imageFileName));
+
+          imageToAdd = {
+            imageFileName,
+            filepath,
+            mimetype,
+            fieldname,
+          };
+          file.pipe(fs.createWriteStream(filepath));
+          imagesToBeUploaded.push(imageToAdd);
+        });
+
+        busboy.on('finish', async () => {
+          let promises = [];
+
+          imagesToBeUploaded.forEach((uploads) => {
+            const type = uploads.fieldname;
+            uploadUrls.push({
+              type,
+              url: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/application-uploads%2F${uploads.imageFileName}?alt=media&token=${generatedToken}`,
+            });
+
+            promises.push(
+              admin
+                .storage()
+                .bucket(config.storageBucket)
+                .upload(uploads.filepath, {
+                  destination: `application-uploads/${uploads.imageFileName}`,
+                  resumable: false,
+                  metadata: {
+                    metadata: {
+                      contentType: uploads.mimetype,
+                      //Generate token to be appended to imageUrl
+                      firebaseStorageDownloadTokens: generatedToken,
+                    },
+                  },
+                })
+            );
+          });
+
+          try {
+            await Promise.all(promises);
+            apprenticeshipDocument
+              .get()
+              .then((doc) => {
+                if (doc.exists) {
+                  apprenticeshipData = doc.data();
+                  apprenticeshipData.apprenticeshipId = doc.id;
+                  organisationId = apprenticeshipData.userId;
+                  apprenticeshipTitle = apprenticeshipData.title;
+                  jobType = apprenticeshipData.jobType;
+                } else {
+                  return res
+                    .status(404)
+                    .json({ error: 'Apprenticeship details not found' });
+                }
+              })
+              .then(() => {
+                const uploadUrl = uploadUrls;
+                newAppilcation.uploadUrl = uploadUrl;
+                newAppilcation.applicantUserId = userId;
+                newAppilcation.applicantUsername = username;
+                newAppilcation.applicantImageUrl = imageUrl;
+                newAppilcation.applicationType = 'apprenticeship';
+                newAppilcation.apprenticeshipId = apprenticeshipId;
+                newAppilcation.createdAt = new Date().toISOString();
+                newAppilcation.organisationId = organisationId;
+                newAppilcation.apprenticeshipTitle = apprenticeshipTitle;
+                newAppilcation.jobType = jobType;
+
+                db.doc(`apprenticeships/${req.params.id}/submissions/${userId}`)
+                  .set(newAppilcation)
+                  .then(() => {
+                    apprenticeshipData.applicantCount++;
+                    return apprenticeshipDocument.update({
+                      applicantCount: apprenticeshipData.applicantCount,
+                    });
+                  })
+                  .catch((err) => {
+                    res.status(500).json({ error: 'something went wrong' });
+                    console.error(err);
+                  });
+              });
+
+            return res.status(200).json({
+              success: `Your application has been submitted`,
+            });
+          } catch (err) {
+            console.log(err);
+            res.status(500).json(err);
+          }
+        });
+
+        busboy.end(req.rawBody);
+      }
+    })
+    .catch((err) => {
+      console.error(err);
+      return res
+        .status(500)
+        .json({ error: 'Something went wrong please try again later.' });
+    });
+};
+
+// Fetch all submissions
+exports.getAllApprenticeshipSubmissions = (req, res) => {
+  db.doc(`apprenticeships/${req.params.id}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res
+          .status(500)
+          .json({ error: 'permission Denied' });
+      }
+    }).then(async() => {
+      return db
+        .collection(
+          `apprenticeships/${req.params.id}/submissions`
+        )
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let submissions = [];
+          let questions = []
+          data.forEach((doc) => {
+            const addQ = JSON.parse(doc.data().additionalQuestions);
+            const edQ = JSON.parse(doc.data().additionalQuestions);
+            const wrkQ = JSON.parse(doc.data().additionalQuestions);
+            addQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            edQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            wrkQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            submissions.push({
+              additionalQuestions: JSON.parse(doc.data().additionalQuestions),
+              address: doc.data().address,
+              applicantImageUrl: doc.data().applicantImageUrl,
+              applicantUserId: doc.data().applicantUserId,
+              applicantUsername: doc.data().applicantUsername,
+              applicationType: doc.data().applicationType,
+              apprenticeshipId: doc.data().apprenticeshipId,
+              apprenticeshipTitle: doc.data().apprenticeshipTitle,
+              cityOrTown: doc.data().cityOrTown,
+              createdAt: doc.data().createdAt,
+              dateOfBirth: doc.data().dateOfBirth,
+              educationQuestions: JSON.parse(doc.data().educationQuestions),
+              email: doc.data().email,
+              jobType: doc.data().jobType,
+              mobile: doc.data().mobile,
+              name: doc.data().name,
+              organisationId: doc.data().organisationId,
+              postCode: doc.data().postCode,
+              preferredName: doc.data().preferredName,
+              pronouns: doc.data().pronouns,
+              referredBy: doc.data().referredBy,
+              uploadUrls: doc.data().uploadUrl,
+              workQuestions: JSON.parse(doc.data().workQuestions),
+              questions
+            });
+
+          });
+          return res.json(submissions);
+        })
+        .catch((err) => {
+          console.error(err);
+          res
+            .status(500)
+            .json({ error: 'Something went wrong fetching the submissions please try again later.' });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res
+        .status(500)
+        .json({ error: 'Something went wrong fetching the document please try again later.' });
+    })
+};
+
+// Fetch one submissions
+exports.getOneApprenticeSubmission = (req, res) => {
+  let submissionData;
+  db.doc(`apprenticeships/${req.params.apprenticeshipId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().organisationId !== req.user.userId) {
+        return res.status(500).json({ error: 'Permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .doc(
+          `apprenticeships/${req.params.apprenticeshipId}/submissions/${req.params.userId}`
+        )
+        .get()
+        .then((doc) => {
+          if (!doc.exists) {
+            return res
+              .status(401)
+              .json({ error: 'Submission not found' });
+          }
+          submissionData = doc.data()
+          return res.status(201).json(submissionData);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res
+        .status(500)
+        .json({
+          error:
+            'Something went wrong fetching the document please try again later.',
+        });
+    });
+};
+
+// add a candidate to the shortlist
+exports.addCandidateToShortList = (req, res) => {
+  const userSubmissionData = req.body
+  const apprenticeshipDoc = db.doc(
+    `/apprenticeships/${req.params.apprenticeshipId}`
+  )
+
+  apprenticeshipDoc.get().then(async (result) => {
+    if (!result.exists) {
+      return res.status(400).json({ error: 'Apprenticeship not found' });
+    }
+    await db
+      .doc(
+        `/apprenticeships/${req.params.apprenticeshipId}/shortlist/${req.body.applicantUserId}`
+      )
+      .set({...userSubmissionData, createdAt: new Date().toISOString()});
+    return res.status(201).json({ success: 'Candidate added to shortlist' });
+  })
+  .catch((err) => {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong please try again later.'})
+  })
+}
+
+// add a candidate to the shortlist
+exports.addCandidateToInterviewList = (req, res) => {
+  const userSubmissionData = req.body
+  const apprenticeshipDoc = db.doc(
+    `/apprenticeships/${req.params.apprenticeshipId}`
+  );
+
+  apprenticeshipDoc
+    .get()
+    .then(async (result) => {
+      if (!result.exists) {
+        return res.status(400).json({ error: 'Apprenticeship not found' });
+      }
+      await db
+        .doc(
+          `/apprenticeships/${req.params.apprenticeshipId}/interview-list/${req.body.applicantUserId}`
+        )
+        .set({ ...userSubmissionData, createdAt: new Date().toISOString() });
+      return res
+        .status(201)
+        .json({ success: 'Candidate added to interview list' });
+    })
+    .catch((err) => {
+      console.error(err);
+      res
+        .status(500)
+        .json({ error: 'Something went wrong please try again later.' });
+    });
+}
+
+exports.getAllShortListedCandidates = (req, res) => {
+  db.doc(`apprenticeships/${req.params.apprenticeshipId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res.status(500).json({ error: 'permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .collection(`apprenticeships/${req.params.apprenticeshipId}/shortlist`)
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let shortlist = [];
+          // let questions = [];
+          data.forEach((doc) => {
+            shortlist.push(doc.data());
+          });
+          return res.json(shortlist);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+exports.getInterviewList = (req, res) => {
+  db.doc(`apprenticeships/${req.params.apprenticeshipId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res.status(500).json({ error: 'permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .collection(
+          `apprenticeships/${req.params.apprenticeshipId}/interview-list`
+        )
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let interviewList = [];
+          // let questions = [];
+          data.forEach((doc) => {
+            // const addQ = JSON.parse(doc.data().additionalQuestions);
+            // const edQ = JSON.parse(doc.data().additionalQuestions);
+            // const wrkQ = JSON.parse(doc.data().additionalQuestions);
+            // addQ.forEach((dc) => {
+            //   questions.push(dc);
+            // });
+            // edQ.forEach((dc) => {
+            //   questions.push(dc);
+            // });
+            // wrkQ.forEach((dc) => {
+            //   questions.push(dc);
+            // });
+            interviewList.push(
+              doc.data()
+              //   {
+              //   additionalQuestions: JSON.parse(doc.data().additionalQuestions),
+              //   address: doc.data().address,
+              //   applicantImageUrl: doc.data().applicantImageUrl,
+              //   applicantUserId: doc.data().applicantUserId,
+              //   applicantUsername: doc.data().applicantUsername,
+              //   applicationType: doc.data().applicationType,
+              //   apprenticeshipId: doc.data().apprenticeshipId,
+              //   apprenticeshipTitle: doc.data().apprenticeshipTitle,
+              //   cityOrTown: doc.data().cityOrTown,
+              //   createdAt: doc.data().createdAt,
+              //   dateOfBirth: doc.data().dateOfBirth,
+              //   educationQuestions: JSON.parse(doc.data().educationQuestions),
+              //   email: doc.data().email,
+              //   jobType: doc.data().jobType,
+              //   mobile: doc.data().mobile,
+              //   name: doc.data().name,
+              //   organisationId: doc.data().organisationId,
+              //   postCode: doc.data().postCode,
+              //   preferredName: doc.data().preferredName,
+              //   pronouns: doc.data().pronouns,
+              //   referredBy: doc.data().referredBy,
+              //   uploadUrls: doc.data().uploadUrl,
+              //   workQuestions: JSON.parse(doc.data().workQuestions),
+              //   questions,
+              // }
+            );
+          });
+          return res.json(interviewList);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+exports.removeShortListedCandidate = (req, res) => {
+  const document = db.doc(
+        `/apprenticeships/${req.params.apprenticeshipId}/shortlist/${req.params.userId}`
+      )
+  document
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: 'Candidate not found not found' });
+      } else {
+        return document.delete();
+      }
+    })
+    .then(() => {
+      res.json({ message: 'The Candidate removed' });
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+};
+
+exports.removeFromInterviewList = (req, res) => {
+  const document = db.doc(
+    `/apprenticeships/${req.params.apprenticeshipId}/interview-list/${req.params.userId}`
+  );
+  document
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: 'Candidate not found not found' });
+      } else {
+        return document.delete();
+      }
+    })
+    .then(() => {
+      res.json({ message: 'The Candidate removed' });
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+};

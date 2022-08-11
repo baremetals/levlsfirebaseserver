@@ -17,6 +17,7 @@ exports.getAllProjects = (req, res) => {
           start_date: doc.data().start_date,
           closing_date: doc.data().closing_date,
           category: doc.data().category,
+          shortDescription: doc.data().shortDescription,
           description: doc.data().description,
           createdAt: doc.data().createdAt,
           registerLink: doc.data().registerLink,
@@ -79,25 +80,31 @@ exports.createProject = (req, res) => {
       isApplication: req.body.isApplication,
       registerLink: req.body.registerLink,
       isActive: false,
+      state: 'draft',
       viewsCount: 0,
       pageUrl: `project/${slug}`,
+      addToCV: req.body.addToCV,
     };
-
     db.collection('projects')
-        .add(newProject)
-        .then((doc) => {
-          resProject = newProject;
-          resProject.timelineId = doc.id;
-          docId = doc.id;
-        })
-        .then(() => {
-          db.doc(`mobile timeline/${docId}`).set(resProject)
-          return res.json(resProject);
-        })
-        .catch((err) => {
-          console.log(err);
-          res.status(500).json({ error: 'Something went wrong' });
-        });
+      .add(newProject)
+      .then((doc) => {
+        resProject = newProject;
+        resProject.timelineId = doc.id;
+        docId = doc.id;
+      })
+      .then(async () => {
+        await db.doc(`mobile timeline/${docId}`).set(resProject);
+        if (req.body.addToCV === true) {
+          await db
+            .doc(`users/${req.user.userId}/digital-cv/${docId}`)
+            .set({ ...resProject, contentType: 'project' });
+        }
+        return res.json(resProject);
+      })
+      .catch((err) => {
+        console.log(err);
+        res.status(500).json({ error: 'Something went wrong' });
+      });
   } else {
     const busboy = new BusBoy({ headers: req.headers });
     const imageUrl = req.user.imageUrl
@@ -110,12 +117,12 @@ exports.createProject = (req, res) => {
     let newProject = {};
 
 
-    busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
+    busboy.on('field', function(fieldname, val, _fieldnameTruncated, _valTruncated, _encoding, _mimetype) {
       // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
       newProject[fieldname] = val
     });
 
-    busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
+    busboy.on("file", (_fieldname, file, filename, _encoding, mimetype) => {
       if (mimetype !== "image/jpeg" && mimetype !== "image/jpg" && mimetype !== "image/png" && mimetype !== "video/mp4" && mimetype !== "video/swf") {
         return res.status(400).json({ error: "Wrong file type submitted" });
       }
@@ -171,6 +178,8 @@ exports.createProject = (req, res) => {
       newProject.viewsCount = 0
       newProject.isActive = false
       newProject.pageUrl = `project/${slug}`
+      newProject.state = 'draft'
+      // newProject.addToCV = addToCV || false;
       db.collection('projects')
         .add(newProject)
         .then((doc) => {
@@ -178,8 +187,13 @@ exports.createProject = (req, res) => {
           resProject.timelineId = doc.id;
           docId = doc.id;
         })
-        .then(() => {
-          db.doc(`mobile timeline/${docId}`).set(resProject)
+        .then(async () => {
+          await db.doc(`mobile timeline/${docId}`).set(resProject);
+          if (newProject.addToCV === true) {
+            await db
+              .doc(`users/${req.user.userId}/digital-cv/${docId}`)
+              .set({ ...resProject, contentType: 'project' });
+          }
           return res.json(resProject);
         })
         .catch((err) => {
@@ -225,11 +239,24 @@ exports.updateProjectDetails = (req, res) => {
 
   projectDocument
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Project not found' });
       }
-      projectDocument.update(projectDetails)
+      if (doc.data().addToCV === true)
+        await db
+          .doc(`/users/${req.user.userId}/digital-cv/${req.params.projectId}`)
+          .get()
+          .then(async (dc) => {
+            if (dc.exists) {
+              await db
+                .doc(
+                  `/users/${req.user.userId}/digital-cv/${req.params.projectId}`
+                )
+                .update(projectDetails);
+            }
+          });
+      await projectDocument.update(projectDetails)
       return db.doc(`/mobile timeline/${req.params.projectId}`).update(projectDetails);
       
     })
@@ -247,10 +274,23 @@ exports.deleteProject = (req, res) => {
   const projectDocument = db.doc(`/projects/${req.params.projectId}`);
   projectDocument
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Project not found' });
       } else {
+        if (doc.data().addToCV === true)
+          await db
+            .doc(`/users/${req.user.userId}/digital-cv/${req.params.projectId}`)
+            .get()
+            .then(async (dc) => {
+              if (dc.exists) {
+                await db
+                  .doc(
+                    `/users/${req.user.userId}/digital-cv/${req.params.projectId}`
+                  )
+                  .delete();
+              }
+            });
         return projectDocument.delete();
       }
     })
@@ -282,11 +322,28 @@ exports.likeProject = (req, res) => {
 
   projectDocument
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (doc.exists) {
         projectData = doc.data();
         projectData.projectId = doc.id;
         uploadOwnerId = projectData.userId
+        if (doc.data().addToCV === true)
+          await db
+            .doc(
+              `/users/${doc.data().userId}/digital-cv/${req.params.projectId}`
+            )
+            .get()
+            .then(async (dc) => {
+              if (!dc.exists) {
+                await db
+                  .doc(
+                    `/users/${doc.data().userId}/digital-cv/${
+                      req.params.projectId
+                    }`
+                  )
+                  .ref.update({ likeCount: doc.data().likeCount + 1 });
+              }
+            });
         return likeDocument.get();
       } else {
         return res.status(404).json({ error: 'Project not found' });
@@ -345,10 +402,27 @@ exports.unLikeProject = (req, res) => {
 
   projectDocument
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (doc.exists) {
         projectData = doc.data();
         projectData.projectId = doc.id;
+        if (doc.data().addToCV === true)
+          await db
+            .doc(
+              `/users/${doc.data().userId}/digital-cv/${req.params.projectId}`
+            )
+            .get()
+            .then(async (dc) => {
+              if (!dc.exists) {
+                await db
+                  .doc(
+                    `/users/${doc.data().userId}/digital-cv/${
+                      req.params.projectId
+                    }`
+                  )
+                  .ref.update({ likeCount: doc.data().likeCount - 1 });
+              }
+            });
         return likeDocument.get();
       } else {
         return res.status(404).json({ error: 'Project not found' });
@@ -403,12 +477,27 @@ exports.commentOnProject = (req, res) => {
 
   db.doc(`/projects/${req.params.projectId}`)
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {        
         return res.status(404).json({ error: 'Project not found' });
       }
       newComment.uploadOwnerId = doc.data().userId;
-      doc.ref.update({ commentCount: doc.data().commentCount + 1 });
+      if (doc.data().addToCV === true)
+        await db
+          .doc(`/users/${doc.data().userId}/digital-cv/${req.params.projectId}`)
+          .get()
+          .then(async (dc) => {
+            if (dc.exists) {
+              await db
+                .doc(
+                  `/users/${doc.data().userId}/digital-cv/${
+                    req.params.projectId
+                  }`
+                )
+                .ref.update({ commentCount: doc.data().commentCount + 1 });
+            }
+          });
+      await doc.ref.update({ commentCount: doc.data().commentCount + 1 });
       return mobTimelineDoc.get()
     })
     .then((doc) => {
@@ -440,13 +529,26 @@ exports.deleteProjectComment = (req, res) => {
 
   commentDoc
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Comment not found' });
       } else {
         projectId = doc.data().projectId
         projectDoc = db.doc(`/projects/${projectId}`);
         timeLineDoc = db.doc(`/mobile timeline/${projectId}`);
+        await projectDoc.get().then(async (d) => {
+          if (d.data().addToCV === true)
+            await db
+              .doc(`/users/${d.data().userId}/digital-cv/${projectId}`)
+              .get()
+              .then(async (dc) => {
+                if (dc.exists) {
+                  await db
+                    .doc(`/users/${d.data().userId}/digital-cv/${projectId}`)
+                    .ref.update({ commentCount: doc.data().commentCount - 1 });
+                }
+              });
+        });
         return commentDoc.delete();
       }
     })

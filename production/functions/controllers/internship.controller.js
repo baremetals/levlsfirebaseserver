@@ -102,6 +102,7 @@ exports.createAnInternship = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'internship',
       isActive: false,
+      state: 'draft',
       applicantCount: 0,
       pageUrl: `internship/${req.body.jobType.toLowerCase()}/${slug}`,
     };

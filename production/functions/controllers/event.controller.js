@@ -3,7 +3,7 @@ const config = require("../utils/database");
 const { uuid } = require('uuidv4');
 const sgMail = require('@sendgrid/mail');
 
-exports.getAllEvents = (req, res) => {
+exports.getAllEvents = (_req, res) => {
   db.collection('events')
     .orderBy('createdAt', 'desc')
     .get()
@@ -11,29 +11,8 @@ exports.getAllEvents = (req, res) => {
       let events = [];
       data.forEach((doc) => {
         events.push({
+          ...doc.data(),
           eventId: doc.id,
-          title: doc.data().title,
-          slug: doc.data().slug,
-          host: doc.data().host,
-          start_date: doc.data().start_date,
-          endDate: doc.data().endDate,
-          category: doc.data().category,
-          time: doc.data().time,
-          endTime: doc.data().endTime,
-          shortDescription: doc.data().shortDescription,
-          description: doc.data().description,
-          location: doc.data().location,
-          createdAt: doc.data().createdAt,
-          registerLink: doc.data().registerLink,
-          website: doc.data().website,
-          eventMediaUrl: doc.data().eventMediaUrl,
-          likeCount: doc.data().likeCount,
-          commentCount: doc.data().commentCount,
-          imageUrl: doc.data().imageUrl,
-          username: doc.data().username,
-          userId: doc.data().userId,
-          viewsCount: doc.data().viewsCount,
-          isPartner: doc.data().isPartner,
         });
       });
       return res.json(events);
@@ -41,6 +20,28 @@ exports.getAllEvents = (req, res) => {
     .catch((err) => {
       console.error(err);
       res.status(500).json({ error: err.code });
+    });
+};
+
+exports.getAllOrgEvents = (req, res) => {
+  db.collection('events')
+    .where('userId', '==', req.params.userId)
+    .orderBy('createdAt', 'desc')
+    .get()
+    .then((data) => {
+      let events = [];
+      data.forEach((doc) => {
+        events.push({
+          ...doc.data(),
+          eventId: doc.id,
+        });
+      });
+
+      return res.json(events);
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: 'Something went wrong please try again.' });
     });
 };
 
@@ -145,6 +146,7 @@ exports.createEvent = (req, res) => {
     newEvent.isActive = false
     newEvent.isPartner = isPartner
     newEvent.pageUrl = `events/${slug}`;
+    newEvent.state = 'draft';
     db.collection('events')
       .add(newEvent)
       .then((doc) => {

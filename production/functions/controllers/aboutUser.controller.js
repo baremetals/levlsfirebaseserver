@@ -74,15 +74,16 @@ exports.deleteEducation = (req, res) => {
 
 exports.updateEducation = (req, res) => {
     let educationDetails = req.body;
+    const cvDoc = db
+          .doc(`users/${req.user.userId}/digital-cv/${req.params.educationId}`)
     db.doc(`users/${req.user.userId}/educations/${req.params.educationId}`)
       .update(educationDetails)
       .then(async() => {
-        // if (!doc.exists) {
-        //   return res.status(404).json({ error: 'Course not found' });
-        // }
-        await db
-          .doc(`users/${req.user.userId}/digital-cv/${req.params.educationId}`)
-          .update(educationDetails);
+        await cvDoc.get().then(async(dc) => {
+          if (dc.exists) {
+            return cvDoc.update(educationDetails)
+          } else return cvDoc.set(educationDetails)
+        })
         return res.json({ message: "Course updated successfully", educationDetails });
       })
       .catch((err) => {
@@ -163,16 +164,19 @@ exports.deleteExperience = (req, res) => {
 }
 
 exports.updateExperience = (req, res) => {
-  console.log(' in here')
     let experienceDetails = req.body;
-    db.doc(`users/${req.user.userId}/experiences/${req.params.experienceId}`)
-      .update(experienceDetails)
-      .then(async() => {
-        await db
+    const cvDoc = db
           .doc(
             `users/${req.user.userId}/digital-cv/${req.params.experienceId}`
           )
-          .update(experienceDetails);
+    db.doc(`users/${req.user.userId}/experiences/${req.params.experienceId}`)
+      .update(experienceDetails)
+      .then(async() => {
+        await cvDoc.get().then(async (dc) => {
+          if (dc.exists) {
+            cvDoc.update(experienceDetails)
+          } else return cvDoc.set(experienceDetails)
+        })
         return res.json({ message: "Experience updated successfully",  experienceDetails});
       })
       .catch((err) => {
@@ -290,45 +294,27 @@ exports.addSkills = (req, res) => {
   
 }
 
-// Do not use this function
-exports.deleteSkills = (req, res) => {
-    const skillsDoc = db.doc(`users/${req.user.userId}/skills/${req.params.skillId}`);
-    skillsDoc
-      .get()
-      .then(async(doc) => {
-        if (!doc.exists) {
-          return res.status(404).json({ error: 'Skill not found' });
-        } else {
-          await db
-            .doc(
-              `users/${req.user.userId}/digital-cv/${req.params.skillId}`
-            )
-            .delete();
-          return skillsDoc.delete();
-        }
-      })
-      .then(() => {
-        res.json({ message: 'Skill deleted successfully' });
-      })
-      .catch((err) => {
-        console.error(err);
-        return res.status(500).json({ error: err.code });
-      });
-}
 
 exports.updateSkills = (req, res) => {
     let skillDetails = req.body;
+    const cvDoc = db.doc(
+      `users/${req.user.userId}/digital-cv/${req.params.skillId}`
+    );
     db.doc(`users/${req.user.userId}/skills/${req.params.skillId}`)
       .update(skillDetails)
       .then(async() => {
-        // if (!doc.exists) {
-        //   return res.status(404).json({ error: 'Skill not found' });
-        // }
-        await db
-          .doc(
-            `users/${req.user.userId}/digital-cv/${req.params.skillId}`
-          )
-          .update(skillDetails);
+        await cvDoc.get().then(async(dc) => {
+          if (dc.exists) {
+            return cvDoc.update(skillDetails);
+          } else {
+            return cvDoc.set(skillDetails);
+          }
+        })
+        // await db
+        //   .doc(
+        //     `users/${req.user.userId}/digital-cv/${req.params.skillId}`
+        //   )
+        //   .update(skillDetails);
         return res.json({ message: "Skill updated successfully", skillDetails });
       })
       .catch((err) => {
@@ -382,9 +368,6 @@ exports.updateInterest = (req, res) => {
     db.doc(`users/${req.user.userId}/interests/${req.params.interestId}`)
       .update(interestDetails)
       .then(() => {
-        // if (!doc.exists) {
-        //   return res.status(404).json({ error: 'Interest not found' });
-        // }
         return res.json({ message: "Interest updated successfully", interestDetails });
       })
       .catch((err) => {

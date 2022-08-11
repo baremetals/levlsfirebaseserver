@@ -100,6 +100,7 @@ exports.createAGrant = (req, res) => {
       closingDate: req.body.closingDate || '',
       applicationLink: req.body.applicationLink || '',
       howtoApply: req.body.howtoApply || '',
+      customQuestions: req.body.customQuestions,
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
       username: req.user.username,
@@ -108,6 +109,7 @@ exports.createAGrant = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'grants',
       isActive: false,
+      state: 'draft',
       applicantCount: 0,
       pageUrl: `grants/${req.body.grantType.toLowerCase()}/${slug}`,
     };

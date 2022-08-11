@@ -146,6 +146,7 @@ exports.createResource = (req, res) => {
       viewsCount: 0,
       resourceType: req.body.resourceType,
       pageUrl: `resources/${slug}`,
+      state: 'draft',
       //registerLink: req.body.registerLink || ''
     };
 
@@ -258,6 +259,7 @@ exports.createResource = (req, res) => {
       newResource.commentCount = 0
       newResource.viewsCount = 0
       newResource.pageUrl = `resources/${slug}`;
+      newResource.state = 'draft'
       db.collection('resources')
         .add(newResource)
         .then((doc) => {
@@ -439,7 +441,9 @@ exports.likeResource = (req, res) => {
             }
             mobTimelineData = doc.data();
             mobTimelineData.likeCount++;
-            return mobUploadDoc.update({ likeCount: mobTimelineData.likeCount });
+            return mobTimelineDoc.update({
+              likeCount: mobTimelineData.likeCount,
+            });
           })
           .then(() => {
             return res.json(resourceData);
@@ -497,7 +501,9 @@ exports.unLikeResource = (req, res) => {
             }
             mobTimelineData = doc.data();
             mobTimelineData.likeCount--;
-            return mobUploadDoc.update({ likeCount: mobTimelineData.likeCount });
+            return mobTimelineDoc.update({
+              likeCount: mobTimelineData.likeCount,
+            });
           })
           .then(() => {
             res.json(resourceData);

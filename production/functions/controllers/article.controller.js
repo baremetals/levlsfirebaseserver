@@ -12,27 +12,11 @@ exports.getAllArticles = (req, res) => {
       let articles = [];
       data.forEach((doc) => {
         articles.push({
+          ...doc.data(),
           articleId: doc.id,
-          title: doc.data().title,
-          shortDescription: doc.data().shortDescription,
-          slug: doc.data().slug,
-          content: doc.data().content,
-          username: doc.data().username,
-          userId: doc.data().userId,
-          imageUrl: doc.data().imageUrl,
-          createdAt: doc.data().createdAt,
-          uploadUrl: doc.data().uploadUrl,
-          contentType: doc.data().contentType,
-          category: doc.data().category,
-          likeCount: doc.data().likeCount,
-          commentCount: doc.data().commentCount,
-          isActive: doc.data().isActive,
-          viewsCount: doc.data().viewsCount,
-          isPartner: doc.data().isPartner,
         });
         
       });
-      
       return res.json(articles);
     })
     .catch((err) => {
@@ -94,6 +78,8 @@ exports.writeAnArticle = (req, res) => {
       viewsCount: 0,
       isPartner: false,
       pageUrl: `article/${slug}`,
+      state: 'draft',
+      addToCV: req.body.addToCV,
     };
 
     db.collection('articles')
@@ -103,8 +89,13 @@ exports.writeAnArticle = (req, res) => {
           resArticle.timelineId = doc.id;
           docId = doc.id;
         })
-        .then(() => {
-          db.doc(`mobile timeline/${docId}`).set(resArticle)
+        .then(async () => {
+          await db.doc(`mobile timeline/${docId}`).set(resArticle)
+          if (req.body.addToCV || req.body.addToCV === 'true') {
+            await db
+              .doc(`users/${req.user.userId}/digital-cv/${docId}`)
+              .set({ ...resArticle, contentType: 'article ' });
+          }
           return res.json(resArticle);
         })
         .catch((err) => {
@@ -124,12 +115,12 @@ exports.writeAnArticle = (req, res) => {
     let newArticle = {};
 
 
-    busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
+    busboy.on('field', function(fieldname, val, _fieldnameTruncated, _valTruncated, _encoding, _mimetype) {
       // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
       newArticle[fieldname] = val
     });
 
-    busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
+    busboy.on("file", (_fieldname, file, filename, _encoding, mimetype) => {
       if (mimetype !== "image/jpeg" && mimetype !== "image/jpg" && mimetype !== "image/png" && mimetype !== "video/mp4" && mimetype !== "video/swf") {
         return res.status(400).json({ error: "Wrong file type submitted" });
       }
@@ -185,7 +176,8 @@ exports.writeAnArticle = (req, res) => {
       newArticle.viewsCount = 0
       newArticle.isActive = false
       newArticle.isPartner = false
-      newArticle.pageUrl = `article/${slug}`;
+      newArticle.pageUrl = `article/${slug}`
+      newArticle.state = 'draft'
       db.collection('articles')
         .add(newArticle)
         .then((doc) => {
@@ -193,8 +185,13 @@ exports.writeAnArticle = (req, res) => {
           resArticle.timelineId = doc.id;
           docId = doc.id;
         })
-        .then(() => {
-          db.doc(`mobile timeline/${docId}`).set(resArticle)
+        .then(async () => {
+          await db.doc(`mobile timeline/${docId}`).set(resArticle)
+          if (resArticle.addToCV || resArticle.addToCV === 'true') {
+            await db
+              .doc(`users/${req.user.userId}/digital-cv/${docId}`)
+              .set({ ...resArticle, contentType: 'article' });
+          }
           return res.json(resArticle);
         })
         .catch((err) => {
@@ -249,19 +246,34 @@ exports.commentOnArticle = (req, res) => {
 
   db.doc(`/articles/${req.params.articleId}`)
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Article not found' });
       }
       newComment.articleOwnerId = doc.data().userId;
-      doc.ref.update({ commentCount: doc.data().commentCount + 1 });
+      await doc.update({ commentCount: doc.data().commentCount + 1 });
+      if (doc.data().addToCV || doc.data().addToCV === 'true')
+        await db
+          .doc(`/users/${doc.data().userId}/digital-cv/${req.params.articleId}`)
+          .get()
+          .then(async (dc) => {
+            if (dc.exists) {
+              await db
+                .doc(
+                  `/users/${doc.data().userId}/digital-cv/${
+                    req.params.articleId
+                  }`
+                )
+                .update({ commentCount: doc.data().commentCount + 1 });
+            }
+          });
       return mobTimelineDoc.get()
     })
     .then((doc) => {
       if (!doc.exists) {        
         return res.status(404).json({ error: 'Mobile content not found' });
       }
-      return doc.ref.update({ commentCount: doc.data().commentCount + 1 });
+      return doc.update({ commentCount: doc.data().commentCount + 1 });
     })
     .then(() => {
       return db.collection('comments').add(newComment);
@@ -286,13 +298,26 @@ exports.deleteArticleComment = (req, res) => {
 
   commentDoc
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Comment not found' });
       } else {
         articleId = doc.data().articleId
         articleDoc = db.doc(`/articles/${articleId}`);
         timeLineDoc = db.doc(`/mobile timeline/${articleId}`);
+        await articleDoc.get().then(async (d) => {
+          if (d.data().addToCV || d.data().addToCV === 'true')
+            await db
+              .doc(`/users/${d.data().userId}/digital-cv/${articleId}`)
+              .get()
+              .then(async (dc) => {
+                if (dc.exists) {
+                  await db
+                    .doc(`/users/${d.data().userId}/digital-cv/${articleId}`)
+                    .ref.update({ commentCount: doc.data().commentCount - 1 });
+                }
+              });
+        });
         return commentDoc.delete();
       }
     })
@@ -327,11 +352,28 @@ exports.likeAnArticle = (req, res) => {
 
   articleDocument
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (doc.exists) {
         articleData = doc.data();
         articleData.articleId = doc.id;
         articleOwnerId = articleData.userId
+        if (doc.data().addToCV || doc.data().addToCV === 'true')
+          await db
+            .doc(
+              `/users/${doc.data().userId}/digital-cv/${req.params.articleId}`
+            )
+            .get()
+            .then(async (dc) => {
+              if (!dc.exists) {
+                await db
+                  .doc(
+                    `/users/${doc.data().userId}/digital-cv/${
+                      req.params.articleId
+                    }`
+                  )
+                  .update({ likeCount: doc.data().likeCount + 1 });
+              }
+            });
         return likeDocument.get();
       } else {
         return res.status(404).json({ error: 'Upload not found' });
@@ -391,10 +433,27 @@ exports.unLikeAnArticle = (req, res) => {
 
   articleDocument
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (doc.exists) {
         articleData = doc.data();
         articleData.articleId = doc.id;
+        if (doc.data().addToCV || doc.data().addToCV === 'true')
+          await db
+            .doc(
+              `/users/${doc.data().userId}/digital-cv/${req.params.articleId}`
+            )
+            .get()
+            .then(async (dc) => {
+              if (!dc.exists) {
+                await db
+                  .doc(
+                    `/users/${doc.data().userId}/digital-cv/${
+                      req.params.articleId
+                    }`
+                  )
+                  .update({ likeCount: doc.data().likeCount - 1 });
+              }
+            });
         return likeDocument.get();
       } else {
         return res.status(404).json({ error: 'Article not found' });
@@ -436,10 +495,23 @@ exports.deleteArticle = (req, res) => {
   const document = db.doc(`/articles/${req.params.articleId}`);
   document
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Article not found' });
       } else {
+        if (doc.data().addToCV || doc.data().addToCV === 'true')
+          await db
+            .doc(`/users/${req.user.userId}/digital-cv/${req.params.articleId}`)
+            .get()
+            .then(async (dc) => {
+              if (dc.exists) {
+                await db
+                  .doc(
+                    `/users/${req.user.userId}/digital-cv/${req.params.articleId}`
+                  )
+                  .delete();
+              }
+            });
         return document.delete();
       }
     })
@@ -462,11 +534,24 @@ exports.updateArticle = (req, res) => {
 
   articleDocument
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Article not found' });
       }
-      articleDocument.update(articleDetails)
+      if (doc.data().addToCV || doc.data().addToCV === 'true')
+        await db
+          .doc(`/users/${req.user.userId}/digital-cv/${req.params.articleId}`)
+          .get()
+          .then(async (dc) => {
+            if (dc.exists) {
+              await db
+                .doc(
+                  `/users/${req.user.userId}/digital-cv/${req.params.articleId}`
+                )
+                .update(articleDetails);
+            }
+          });
+      await articleDocument.update(articleDetails)
       return db.doc(`/mobile timeline/${req.params.articleId}`).update(articleDetails);
       
     })

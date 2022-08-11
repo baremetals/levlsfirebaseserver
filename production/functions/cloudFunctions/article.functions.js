@@ -53,7 +53,7 @@ exports.articleActiveNotification = functions
 exports.articleCommentNotification = functions
   .region('europe-west2')
   .firestore.document('comments/{id}')
-  .onCreate((snapshot) => {
+  .onCreate(async (snapshot) => {
     const username = snapshot.data().username
     const imageUrl = snapshot.data().userImage
     return db
@@ -86,7 +86,7 @@ exports.articleCommentNotification = functions
 exports.deleteNotificationOnDeleteArticleComment = functions
   .region('europe-west2')
   .firestore.document('comments/{id}')
-  .onDelete((snapshot) => {
+  .onDelete(async (snapshot) => {
     
     return db
     .doc(`/notifications/${snapshot.id}`)
@@ -100,7 +100,7 @@ exports.deleteNotificationOnDeleteArticleComment = functions
 exports.createNotificationOnArticleLike = functions
   .region('europe-west2')
   .firestore.document('likes/{id}')
-  .onCreate((snapshot) => {
+  .onCreate(async (snapshot) => {
     return db
       .doc(`/articles/${snapshot.data().articleId}`)
       .get()
@@ -129,7 +129,7 @@ exports.createNotificationOnArticleLike = functions
 exports.deleteNotificationOnUnLikeArticle = functions
   .region('europe-west2')
   .firestore.document('likes/{id}')
-  .onDelete((snapshot) => {
+  .onDelete(async (snapshot) => {
     return db
       .doc(`/notifications/${snapshot.id}`)
       .delete()
@@ -142,7 +142,7 @@ exports.deleteNotificationOnUnLikeArticle = functions
 exports.onArticleDelete = functions
   .region('europe-west2')
   .firestore.document('articles/{articlesId}')
-  .onDelete((snapshot, context) => {
+  .onDelete(async (snapshot, _context) => {
     const articleId = snapshot.id;
     const batch = db.batch();
     return db

@@ -81,12 +81,10 @@ exports.changeUsername = (req, res) => {
 
           // if its not assigned and exists someone else owns it
           if (unameDoc.exists) {
-            return res
-              .status(400)
-              .json({
-                error: 400,
-                code: 'sorry this username is already taken',
-              });
+            return res.status(400).json({
+              error: 400,
+              code: 'sorry this username is already taken',
+            });
           }
 
           return Promise.resolve();
@@ -214,11 +212,9 @@ exports.oldResetPassword = (req, res) => {
     .auth()
     .sendPasswordResetEmail(email)
     .then(() => {
-      return res
-        .status(201)
-        .json({
-          success: 'email sent, please check your inbox and spam/junk folders.',
-        });
+      return res.status(201).json({
+        success: 'email sent, please check your inbox and spam/junk folders.',
+      });
     })
     .catch((err) => {
       console.error(err);
@@ -230,47 +226,32 @@ exports.oldResetPassword = (req, res) => {
 
 // Update user email-logged-in
 exports.updateEmailAdd = (req, res) => {
-  const user = firebase.auth().currentUser;
-
   const newEmail = req.body.email;
-
   const credentials = {
     email: req.body.email,
-    // password: req.body.password,
   };
   const { valid, errors } = validateEmailData(newEmail);
   if (!valid) return res.status(400).json(errors);
 
-  console.log(newEmail);
-
-  user
-    .updateEmail(newEmail)
-    .then(() => {
-      db.doc(`/users/${req.user.userId}`).update(credentials);
+  defaultAuth
+    .updateUser(req.user.userId, {
+      email: credentials.email,
     })
-    .then(() => {
-      user.sendEmailVerification();
-    })
-    .then(function () {
+    .then(async () => {
+      await db.doc(`/users/${req.user.userId}`).update(credentials);
+      res.clearCookie('session');
       return res.status(201).json({ success: 'email has been updated' });
     })
     .catch((err) => {
-      console.error(err);
+      console.error('this is the error mate: ', err);
       return res
         .status(403)
         .json({ error: 'unsuccessful, please try again later' });
     });
-
-  // user.reauthenticateWithCredential(credentials).then(function() {
-
-  // }).catch(function(error) {
-  //   // An error happened.
-  // });
 };
 
 // Update user password-logged-in
 exports.updatePassword = (req, res) => {
-  const user = firebase.auth().currentUser;
   const newPassword = {
     password: req.body.password,
     confirmPassword: req.body.confirmPassword,
@@ -280,15 +261,18 @@ exports.updatePassword = (req, res) => {
 
   if (!valid) return res.status(400).json(errors);
 
-  user
-    .updatePassword(newPassword.password)
+  defaultAuth
+    .updateUser(req.user.userId, {
+      password: newPassword.password,
+    })
     .then(() => {
+      res.clearCookie('session');
       return res
         .status(201)
         .json({ success: 'your password has been updated' });
     })
     .catch((err) => {
-      console.error(err);
+      console.error('this is the error print: ', err);
       return res
         .status(403)
         .json({ error: 'password rejected, please try again' });
@@ -298,10 +282,19 @@ exports.updatePassword = (req, res) => {
 // Edit user details
 exports.editUserDetails = (req, res) => {
   let userDetails = reduceUserDetails(req.body);
-  console.log(userDetails);
+  // console.log(userDetails);
   db.doc(`/users/${req.user.userId}`)
     .update(userDetails)
-    .then(() => {
+    .then(async() => {
+      await db.collection('notifications').add({
+        createdAt: new Date().toISOString(),
+        message: 'Your details have been updated',
+        type: 'details update',
+        read: false,
+        recipient: req.user.userId,
+        sender: 'levls',
+        avatar: '',
+      });
       return res.json({ success: 'Details edited successfully' });
     })
     .catch((err) => {
@@ -313,10 +306,13 @@ exports.editUserDetails = (req, res) => {
 // Edit userBio
 exports.editBio = (req, res) => {
   let bioDetails = reduceBioDetails(req.body);
-  console.log(bioDetails);
+  // console.log(bioDetails);
   db.doc(`/users/${req.user.userId}`)
     .update(bioDetails)
-    .then(() => {
+    .then(async () => {
+      await db
+        .doc(`/users/${req.user.userId}/digital-cv/${req.user.userId}`)
+        .update(bioDetails);
       return res.json({ success: 'Bio edited successfully' });
     })
     .catch((err) => {
@@ -495,7 +491,6 @@ exports.getAuthenticatedUser = (req, res) => {
 
 // Get all usernames
 exports.getAllUsernames = (_req, res) => {
-
   db.collection('usernames')
     .orderBy('createdAt', 'desc')
     .get()
@@ -522,7 +517,7 @@ exports.getAllUsernames = (_req, res) => {
 };
 
 // Upload a profile image for user
-exports.uploadImage = (req, res) => {
+exports.uploadImage = async (req, res) => {
   const BusBoy = require('busboy');
   const path = require('path');
   const os = require('os');
@@ -530,7 +525,10 @@ exports.uploadImage = (req, res) => {
 
   if (req.body.imageUrl) {
     const imageUrl = req.body.imageUrl;
-    db.doc(`/users/${req.user.userId}`).update({ imageUrl });
+    await db.doc(`/users/${req.user.userId}`).update({ imageUrl });
+    await db
+            .doc(`/users/${req.user.userId}/digital-cv/${req.user.userId}`)
+            .update({ imageUrl });
     return res.json({ success: 'image uploaded successfully' });
   } else {
     const busboy = new BusBoy({ headers: req.headers });
@@ -575,9 +573,12 @@ exports.uploadImage = (req, res) => {
             },
           },
         })
-        .then(() => {
+        .then(async () => {
           // Append token to url
           const imageUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/profile-images%2F${imageFileName}?alt=media&token=${generatedToken}`;
+          await db
+            .doc(`/users/${req.user.userId}/digital-cv/${req.user.userId}`)
+            .update({ imageUrl });
           return db.doc(`/users/${req.user.userId}`).update({ imageUrl });
         })
         .then(() => {
@@ -686,11 +687,9 @@ exports.uploadCV = (req, res) => {
       mimetype !==
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ) {
-      return res
-        .status(400)
-        .json({
-          error: 'Wrong file type submitted. Only word and pdf files allowed',
-        });
+      return res.status(400).json({
+        error: 'Wrong file type submitted. Only word and pdf files allowed',
+      });
     }
     // my.image.png => ['my', 'image', 'png']
     const imageExtension = filename.split('.')[filename.split('.').length - 1];
@@ -888,7 +887,6 @@ exports.activateUser = (req, res) => {
         .status(500)
         .json({ error: 'something went wrong, please try again later' });
     });
-  
 };
 
 exports.getLoggedInUserFollowingList = (req, res) => {
@@ -917,7 +915,7 @@ exports.getLoggedInUserFollowingList = (req, res) => {
             followedUserId: doc.data().followedUserId,
             followedUserImageUrl: doc.data().followedUserImageUrl,
             followedUserOccupationOrIndustry:
-            doc.data().followedUserOccupationOrIndustry,
+              doc.data().followedUserOccupationOrIndustry,
             followedUserUsername: doc.data().followedUserUsername,
             fieldOfStudy: doc.data().fieldOfStudy,
           });
@@ -1227,12 +1225,15 @@ exports.forgotPassword = (req, res) => {
             await db
               .doc(`resetPasswordTokens/${generatedToken}`)
               .set(resetPasswordData)
-            .then(async () => {
-              await sgMail.send(msg);
-            return res
-              .status(201)
-              .json({ success: 'Please check your email for the reset password link.' });
-            })
+              .then(async () => {
+                await sgMail.send(msg);
+                return res
+                  .status(201)
+                  .json({
+                    success:
+                      'Please check your email for the reset password link.',
+                  });
+              });
           }
         });
     })
@@ -1246,7 +1247,7 @@ exports.forgotPassword = (req, res) => {
     });
 };
 
-// Reset Password 
+// Reset Password
 exports.resetPassword = (req, res) => {
   // const user = firebase.auth().currentUser;
   const newPassword = {
@@ -1254,8 +1255,7 @@ exports.resetPassword = (req, res) => {
     confirmPassword: req.body.confirmPassword,
   };
 
-  const getTokenDoc = db
-    .doc(`resetPasswordTokens/${req.body.code}`)
+  const getTokenDoc = db.doc(`resetPasswordTokens/${req.body.code}`);
 
   const { valid, errors } = validatePasswordChange(newPassword);
 
@@ -1273,14 +1273,16 @@ exports.resetPassword = (req, res) => {
         const currentDate = dayjs(new Date());
         const createdAt = dayjs(data.createdAt);
         const expiryDate = currentDate.diff(createdAt, 'hour');
-        if (expiryDate / 24 >= 2) return res
-          .status(403)
-          .json({ error: 'Invalid token please request a new token' });
+        if (expiryDate / 24 >= 2)
+          return res
+            .status(403)
+            .json({ error: 'Invalid token please request a new token' });
         // console.log(date1.diff(date2, 'hour'));
         defaultAuth
           .updateUser(data.userId, { password: newPassword.password })
           .then(async () => {
-            await db.doc(`users/${data.userId}`)
+            await db
+              .doc(`users/${data.userId}`)
               .get()
               .then(async (userDoc) => {
                 const userData = userDoc.data();
@@ -1397,7 +1399,6 @@ exports.sessionsLogin = (req, res) => {
     });
 };
 
-
 // Sign users up
 exports.signup = (req, res) => {
   let usageTotalRef;
@@ -1408,18 +1409,18 @@ exports.signup = (req, res) => {
     usageTotalRef = db.collection('codes').doc(req.body.signUpCode);
   const batch = db.batch();
 
-  const adminMsg = {
-    to: 'admin@levls.io', // recipient
-    from: 'LEVLS. <noreply@levls.io>',
-    subject: `New user sign up - ${req.body.username}`,
-    text: `${req.body.username}, just created an account`,
-    html: `
-        <h3> Hello Admin </h3>
-        <p>You have a new ${req.body.userType || 'Personal'} user.</p>
-        <p>Thank You.</p>
-        <p>LEVLS</p>
-      `,
-  };
+  // const adminMsg = {
+  //   to: 'admin@levls.io', // recipient
+  //   from: 'LEVLS. <noreply@levls.io>',
+  //   subject: `New user sign up - ${req.body.username}`,
+  //   text: `${req.body.username}, just created an account`,
+  //   html: `
+  //       <h3> Hello Admin </h3>
+  //       <p>You have a new ${req.body.userType || 'Personal'} user.</p>
+  //       <p>Thank You.</p>
+  //       <p>LEVLS</p>
+  //     `,
+  // };
 
   const newUser = {
     firstName: req.body.firstName,
@@ -1514,66 +1515,62 @@ exports.signup = (req, res) => {
                 followedUserCountry: 'UK',
                 followedUserOccupationOrIndustry: 'Technology',
               });
-            return db
-              .collection('usernames')
-              .doc(`${newUser.username}`)
-              .set({
-                uid,
-                createdAt: new Date().toISOString(),
-                imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
-                fullname: '',
-                isActive: false,
-              })
-              // .then(() => {
-              //   const userExperience = {};
-              //   db.collection(`users/${userId}/experiences`).add(
-              //     userExperience
-              //   );
-              // })
-              // .then(() => {
-              //   const userEducation = {};
-              //   db.collection(`users/${userId}/educations`).add(userEducation);
-              // })
-              // .then(() => {
-              //   const userSkills = {};
-              //   db.collection(`users/${userId}/skills`).add(userSkills);
-              // })
-              // .then(() => {
-              //   const userInterests = {};
-              //   db.collection(`users/${userId}/interests`).add(userInterests);
-              //   //
-              // })
-              .then(() => {
-                batch.set(
-                  totalUsersRef,
-                  { totalCount: increment },
-                  { merge: true }
-                );
-                batch.set(
-                  inActiveUsersRef,
-                  { totalCount: increment },
-                  { merge: true }
-                );
-                if (req.body.signUpCode !== '')
+
+            await db.doc(`users/${userId}/digital-cv/${userId}`).set({
+              createdAt: new Date().toISOString(),
+              firstName: userCredentials.firstName,
+              lastName: userCredentials.lastName,
+              occupation: '',
+              imageUrl: userCredentials.imageUrl,
+              isCvPrivate: true,
+              bio: '',
+              profileVideo: '',
+              contentType: 'personal',
+            });
+            return (
+              db
+                .collection('usernames')
+                .doc(`${newUser.username}`)
+                .set({
+                  uid,
+                  createdAt: new Date().toISOString(),
+                  imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
+                  fullname: newUser.firstName + ' ' + newUser.lastName,
+                  isActive: false,
+                })
+                .then(() => {
                   batch.set(
-                    usageTotalRef,
-                    { usageTotal: increment },
+                    totalUsersRef,
+                    { totalCount: increment },
                     { merge: true }
                   );
-                batch.commit();
-              })
-              .then(async () => {
-                await sgMail.send(adminMsg);
-                return res
-                  .status(201)
-                  .json({ success: 'Your user account has been created.' });
-              })
-              .catch(err => {
-                console.error(err);
-                return res.status(500).json({
-                  error: 'The server is out for lunch, please try again later.',
-                });
-              })
+                  batch.set(
+                    inActiveUsersRef,
+                    { totalCount: increment },
+                    { merge: true }
+                  );
+                  if (req.body.signUpCode !== '')
+                    batch.set(
+                      usageTotalRef,
+                      { usageTotal: increment },
+                      { merge: true }
+                    );
+                  batch.commit();
+                })
+                .then(async () => {
+                  // await sgMail.send(adminMsg);
+                  return res
+                    .status(201)
+                    .json({ success: 'Your user account has been created.' });
+                })
+                .catch((err) => {
+                  console.error(err);
+                  return res.status(500).json({
+                    error:
+                      'The server is out for lunch, please try again later.',
+                  });
+                })
+            );
           })
           .catch((err) => {
             console.error(err);
@@ -1591,14 +1588,13 @@ exports.signup = (req, res) => {
         return res.status(500).json({
           error: 'The server is out for lunch, please try again later.',
         });
-      })      
+      });
   }
 };
 
-
 exports.signin = (req, res) => {
   // Get the ID token passed and the CSRF token.
-  
+
   const idToken = req.body.idToken;
   // const csrfToken = req.body.csrfToken;
   // Guard against CSRF attacks.
@@ -1616,42 +1612,39 @@ exports.signin = (req, res) => {
   // To only allow session cookie setting on recent sign-in, auth_time in ID token
   // can be checked to ensure user was recently signed in before creating a session cookie.
 
-  defaultAuth
-    .verifyIdToken(idToken)
-    .then((decodedIdToken) => {
-      // Only process if the user just signed in in the last 5 minutes.
-      if (new Date().getTime() / 1000 - decodedIdToken.auth_time < 5 * 60) {
-        // Create session cookie and set it.
-        return defaultAuth
-          .createSessionCookie(idToken, { expiresIn })
-          .then(
-            (sessionCookie) => {
-              // Set cookie policy for session cookie.
-              const options = {
-                maxAge: expiresIn,
-                httpOnly: true,
-                secure: true,
-              };
-              res.cookie('session', sessionCookie, options);
-              res.end(JSON.stringify({ status: 'success', session: sessionCookie }));
-            },
-            (_error) => {
-              res.status(401).send('UNAUTHORIZED REQUEST!');
-            }
+  defaultAuth.verifyIdToken(idToken).then((decodedIdToken) => {
+    // Only process if the user just signed in in the last 5 minutes.
+    if (new Date().getTime() / 1000 - decodedIdToken.auth_time < 5 * 60) {
+      // Create session cookie and set it.
+      return defaultAuth.createSessionCookie(idToken, { expiresIn }).then(
+        (sessionCookie) => {
+          // Set cookie policy for session cookie.
+          const options = {
+            maxAge: expiresIn,
+            httpOnly: true,
+            secure: true,
+          };
+          res.cookie('session', sessionCookie, options);
+          res.end(
+            JSON.stringify({ status: 'success', session: sessionCookie })
           );
-      }
-      // A user that was not recently signed in is trying to set a session cookie.
-      // To guard against ID token theft, require re-authentication.
-      res.status(401).send('Recent sign in required!');
-    });
+        },
+        (_error) => {
+          res.status(401).send('UNAUTHORIZED REQUEST!');
+        }
+      );
+    }
+    // A user that was not recently signed in is trying to set a session cookie.
+    // To guard against ID token theft, require re-authentication.
+    res.status(401).send('Recent sign in required!');
+  });
 };
 
-
-exports.logout = (req, res) => {
+exports.logout = (_req, res) => {
   res.clearCookie('session');
   // res.redirect('/login');
   res.status(201).send('You are logged out!');
-}
+};
 
 exports.getDigitalCV = (req, res) => {
   db.collection(`users/${req.params.userId}/digital-cv`)
@@ -1667,7 +1660,7 @@ exports.getDigitalCV = (req, res) => {
       console.error(err);
       res.status(500).json({ error: 'Something went wrong please try again.' });
     });
-}
+};
 
 exports.getMyDigitalCV = (req, res) => {
   db.collection(`users/${req.user.userId}/digital-cv`)
@@ -1683,4 +1676,122 @@ exports.getMyDigitalCV = (req, res) => {
       console.error(err);
       res.status(500).json({ error: 'Something went wrong please try again.' });
     });
+};
+
+
+exports.addProfileVideo = (req, res) => {
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+  let uploadUrl;
+
+  if (req.body.customUrl || req.body.customUrl === '') {
+    const video = {
+      profileVideo: req.body.customUrl,
+      updatedAt: new Date().toISOString(),
+    };
+    db.doc(`users/${req.user.userId}`)
+      .update(video)
+      .then(async(_doc) => {
+        await db
+              .doc(`users/${req.user.userId}/digital-cv/${req.user.userId}`)
+              .update(newUpload);
+        return res
+          .status(201)
+          .json({ success: 'Profile video successfully updated' });
+      })
+      .catch((err) => {
+        console.log(err);
+        res.status(500).json({ error: 'Something went wrong' });
+      });
+  } else {
+    const busboy = new BusBoy({ headers: req.headers });
+    // const username = req.user.username;
+    const userId = req.user.userId;
+    // const imageUrl = req.user.imageUrl;
+
+    let contentToBeUploaded = {};
+    let uploadFileName;
+    let generatedToken = v4();
+    let newUpload = {};
+
+    busboy.on(
+      'field',
+      function (
+        fieldname,
+        val,
+        _fieldnameTruncated,
+        _valTruncated,
+        _encoding,
+        _mimetype
+      ) {
+        newUpload[fieldname] = val;
+      }
+    );
+
+    busboy.on('file', (_fieldname, file, filename, _encoding, mimetype) => {
+      if (
+        mimetype !== 'video/webm' &&
+        mimetype !== 'video/mp4' &&
+        mimetype !== 'video/swf'
+      ) {
+        return res.status(400).json({ error: 'Wrong file type submitted' });
+      }
+      const contentExtension =
+        filename.split('.')[filename.split('.').length - 1];
+      // 32756238461724837.png
+      uploadFileName = `${Math.round(
+        Math.random() * 1000000000000
+      ).toString()}.${contentExtension}`;
+      const filepath = path.join(os.tmpdir(), path.basename(uploadFileName));
+      contentToBeUploaded = { filepath, mimetype };
+      file.pipe(fs.createWriteStream(filepath));
+    });
+
+    busboy.on('finish', async () => {
+      let promise;
+      uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/uploads%2F${uploadFileName}?alt=media&token=${generatedToken}`;
+      promise = admin
+        .storage()
+        .bucket(config.storageBucket)
+        .upload(contentToBeUploaded.filepath, {
+          destination: `uploads/${uploadFileName}`,
+          resumable: false,
+          metadata: {
+            metadata: {
+              contentType: contentToBeUploaded.mimetype,
+              //Generate token to be appended to imageUrl
+              firebaseStorageDownloadTokens: generatedToken,
+            },
+          },
+        });
+
+      try {
+        await Promise.resolve(promise);
+        newUpload.profileVideo = uploadUrl;
+        newUpload.updatedAt = new Date().toISOString();
+        db.doc(`users/${userId}`)
+          .update(newUpload)
+          .then(async(_doc) => {
+            await db
+              .doc(`users/${userId}/digital-cv/${userId}`)
+              .update(newUpload);
+            return res
+              .status(201)
+              .json({ success: 'Profile video successfully updated' });
+          })
+          .catch((err) => {
+            res
+              .status(500)
+              .json({ error: 'something went wrong with the update' });
+            console.error(err);
+          });
+      } catch (err) {
+        res.status(500).json({ error: 'something went wrong' });
+        console.error(err);
+      }
+    });
+    busboy.end(req.rawBody);
+  }
 };

@@ -23,7 +23,7 @@ router.route('/user-skills/')
 
 router.route('/user-skill/:skillId')
   .post(FBAuth.protect, aboutHelper.updateSkills)
-  .delete(FBAuth.protect, aboutHelper.deleteSkills)
+  // .delete(FBAuth.protect, aboutHelper.deleteSkills)
 
 router.route('/user-interests/')
   .post(FBAuth.protect, aboutHelper.addInterests)
@@ -35,5 +35,14 @@ router
 router.route('/user-interest/:interestId')
   .delete(FBAuth.protect, aboutHelper.deleteInterest)
   .post(FBAuth.protect, aboutHelper.updateInterest)
+
+
+router.route('/user-cert/').post(FBAuth.protect, aboutHelper.addCertification);
+
+router
+  .route('/user-cert/:certId')
+  .post(FBAuth.protect, aboutHelper.updateCertification)
+  .delete(FBAuth.protect, aboutHelper.deleteCertification);
+
 
 module.exports = router;

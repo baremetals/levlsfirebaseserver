@@ -147,6 +147,52 @@ exports.protect = (req, res, next) => {
     });
 };
 
+exports.protectOrgData = (req, res, next) => {
+  let idToken;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer ')
+  ) {
+    idToken = req.headers.authorization.split('Bearer ')[1];
+  } else {
+    console.error('No token found');
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  defaultAuth
+    .verifySessionCookie(idToken, true /** checkRevoked */)
+    .then((claims) => {
+      return db
+        .collection('users')
+        .where('userId', '==', claims.sub)
+        .limit(1)
+        .get();
+    })
+    .then((data) => {
+      // console.log('the document', data.docs[0].data().userId);
+      req.user = data.docs[0].data();
+      // console.log('the request user', req.user);
+       if (req.user.userType !== 'Organisation') {
+         return res.status(500).json({ error: 'Permission Denied' });
+       } else {
+        return next();
+       }
+      
+      
+    })
+    .catch((error) => {
+      if (error.code === 'auth/id-token-expired') {
+        console.error('Your token has expired please sign in again', error);
+        return res
+          .status(401)
+          .json({ error: 'Your session has expired. Please signin again.' });
+      } else {
+        console.error('Error while verifying token ', error);
+        return res.status(403).json({ error: 'Error while verifying token ' });
+      }
+    });
+};
+
 exports.local = (req, res, next) => {
   db.collection('users')
     .where('userId', '==', 'SuS3gryLV1RAOzPRmBQ9WOHy5CVd')
@@ -164,6 +210,68 @@ exports.local = (req, res, next) => {
           .json({ error: 'Your session has expired. Please signin again.' });
       } else {
         console.error('Error while verifying token ', err);
+        return res.status(403).json({ error: 'Error while verifying token ' });
+      }
+    });
+};
+
+
+exports.checkUserPreviousSubmission = (req, res, next) => {
+  const itemCollection = db.collection(
+          `apprenticeships/${req.params.id}/submissions`
+        );
+  let idToken;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer ')
+  ) {
+    idToken = req.headers.authorization.split('Bearer ')[1];
+  } else {
+    console.error('No token found');
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  defaultAuth
+    .verifySessionCookie(idToken, true /** checkRevoked */)
+    .then((claims) => {
+      return db
+        .collection('users')
+        .where('userId', '==', claims.sub)
+        .limit(1)
+        .get();
+    })
+    .then((data) => {
+      req.user = data.docs[0].data();
+      itemCollection
+        .doc(req.user.userId)
+        .get()
+        .then((doc) => {
+          if (doc.exists) {
+            return res
+              .status(500)
+              .json({
+                error:
+                  'You have already submitted an application, permission denied',
+              });
+          } else {
+            return next();
+          }
+        })
+        .catch((err) => {
+          console.error(err)
+          return res
+            .status(500)
+            .json({ error: 'Something went wrong please try again later.' });
+        })
+    })
+    .catch((error) => {
+      if (error.code === 'auth/id-token-expired') {
+        console.error('Your token has expired please sign in again', error);
+        return res
+          .status(401)
+          .json({ error: 'Your session has expired. Please signin again.' });
+      } else {
+        console.error('Error while verifying token ', error);
         return res.status(403).json({ error: 'Error while verifying token ' });
       }
     });

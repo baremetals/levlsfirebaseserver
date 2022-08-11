@@ -1,8 +1,8 @@
 const { admin, db, firebase, defaultAuth, dayjs } = require('../utils/admin');
 const config = require("../utils/database");
-const { uuid } = require('uuidv4');
+const { v4 } = require('uuid');
 const sgMail = require('@sendgrid/mail')
-var request = require('request');
+const request = require('request');
 
 
 const {
@@ -141,6 +141,7 @@ exports.signup = (req, res) => {
               linkedIn: '',
               profileUrl: '',
               signUpCode: newUser.signUpCode,
+              isCvPrivate: true,
             };
             await db.doc(`/users/${userId}`).set(userCredentials);
             await db
@@ -155,6 +156,17 @@ exports.signup = (req, res) => {
                 followedUserCountry: 'UK',
                 followedUserOccupationOrIndustry: 'Technology',
               });
+              await db.doc(`users/${userId}/digital-cv/${userId}`).set({
+                createdAt: new Date().toISOString(),
+                firstName: userCredentials.firstName,
+                lastName: userCredentials.lastName,
+                occupation: '',
+                imageUrl: userCredentials.imageUrl,
+                isCvPrivate: true,
+                bio: '',
+                profileVideo: '',
+                contentType: 'personal',
+              });
             return db
               .collection('usernames')
               .doc(`${newUser.username}`)
@@ -162,27 +174,8 @@ exports.signup = (req, res) => {
                 uid,
                 createdAt: new Date().toISOString(),
                 imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
-                fullname: '',
+                fullname: newUser.firstName + ' ' + newUser.lastName,
                 isActive: false,
-              })
-              .then(() => {
-                const userExperience = {};
-                db.collection(`users/${userId}/experiences`).add(
-                  userExperience
-                );
-              })
-              .then(() => {
-                const userEducation = {};
-                db.collection(`users/${userId}/educations`).add(userEducation);
-              })
-              .then(() => {
-                const userSkills = {};
-                db.collection(`users/${userId}/skills`).add(userSkills);
-              })
-              .then(() => {
-                const userInterests = {};
-                db.collection(`users/${userId}/interests`).add(userInterests);
-                //
               })
               .then(() => {
                 batch.set(
@@ -222,13 +215,13 @@ exports.signup = (req, res) => {
               return res.status(400).json({ error: 'Email is already in use' });
             } else {
               return res.status(500).json({
-                error: 'The server is out for lunch, please try again later.',
+                error: 'The something strange is happening, its aliens.',
               });
             }
           });
       })
       .catch((err) => {
-        console.error(err);
+        console.log(err);
         return res.status(500).json({
           error: 'The server is out for lunch, please try again later.',
         });
@@ -359,7 +352,7 @@ exports.forgotPassword = (req, res) => {
         .then(async (doc) => {
           if (doc.exists) {
             const userData = doc.data();
-            let generatedToken = uuid();
+            let generatedToken = v4();
             const msg = {
               to: `${userData.email}`, // recipient
               from: 'LEVLS. <noreply@levls.io>', // Change to verified sender
@@ -468,78 +461,74 @@ exports.resetPassword = (req, res) => {
 
 // Update user email-logged-in
 exports.updateEmailAdd = (req, res) => {
-  const user = firebase.auth().currentUser;
-  
-  const newEmail = req.body.email
-
+  const newEmail = req.body.email;
   const credentials = {
     email: req.body.email,
-    // password: req.body.password,
-  }
+  };
   const { valid, errors } = validateEmailData(newEmail);
   if (!valid) return res.status(400).json(errors);
-  
-  // console.log(newEmail)
 
-  user
-    .updateEmail(newEmail)
-    .then(() => {
-      db.doc(`/users/${req.user.userId}`)
-        .update(credentials)
+  defaultAuth
+    .updateUser(req.user.userId, {
+      email: credentials.email,
     })
-    .then(() => {
-      user
-        .sendEmailVerification()
-    })
-    .then(function() {
-      return res.status(201).json({success: "email has been updated"});
+    .then(async () => {
+      await db.doc(`/users/${req.user.userId}`).update(credentials);
+      res.clearCookie('session');
+      return res.status(201).json({ success: 'email has been updated' });
     })
     .catch((err) => {
-      console.error(err);
+      console.error('this is the error mate: ', err);
       return res
         .status(403)
-        .json({ error: "unsuccessful, please try again later" });
+        .json({ error: 'unsuccessful, please try again later' });
     });
-  
-  // user.reauthenticateWithCredential(credentials).then(function() {
-    
-  // }).catch(function(error) {
-  //   // An error happened.
-  // }); 
 };
 
 // Update user password-logged-in
 exports.updatePassword = (req, res) => {
-  const user = firebase.auth().currentUser;
   const newPassword = {
     password: req.body.password,
-    confirmPassword: req.body.confirmPassword
-  }
+    confirmPassword: req.body.confirmPassword,
+  };
 
   const { valid, errors } = validatePasswordChange(newPassword);
 
   if (!valid) return res.status(400).json(errors);
 
-  user    
-    .updatePassword(newPassword.password)
+  defaultAuth
+    .updateUser(req.user.userId, {
+      password: newPassword.password,
+    })
     .then(() => {
-      return res.status(201).json({success: "your password has been updated"});
+      res.clearCookie('session');
+      return res
+        .status(201)
+        .json({ success: 'your password has been updated' });
     })
     .catch((err) => {
-      console.error(err);
+      console.error('this is the error print: ', err);
       return res
         .status(403)
-        .json({ error: "password rejected, please try again" });
+        .json({ error: 'password rejected, please try again' });
     });
 };
 
 // Edit user details
 exports.editUserDetails = (req, res) => {
   let userDetails = reduceUserDetails(req.body);
-  console.log(userDetails)
   db.doc(`/users/${req.user.userId}`)
     .update(userDetails)
-    .then(() => {
+    .then(async() => {
+      await db.collection('notifications').add({
+        createdAt: new Date().toISOString(),
+        message: 'Your details have been updated',
+        type: 'details update',
+        read: false,
+        recipient: req.user.userId,
+        sender: 'levls',
+        avatar: '',
+      });
       return res.json({ success: "Details edited successfully" });
     })
     .catch((err) => {
@@ -555,7 +544,10 @@ exports.editBio = (req, res) => {
   console.log(bioDetails)
   db.doc(`/users/${req.user.userId}`)
     .update(bioDetails)
-    .then(() => {
+    .then(async() => {
+      await db
+        .doc(`/users/${req.user.userId}/digital-cv/${req.user.userId}`)
+        .update(bioDetails);
       return res.json({ success: "Bio edited successfully" });
     })
     .catch((err) => {
@@ -768,7 +760,7 @@ exports.getAllUsernames = (_req, res) => {
 };
 
 // Upload a profile image for user
-exports.uploadImage = (req, res) => {
+exports.uploadImage = async (req, res) => {
   const BusBoy = require("busboy");
   const path = require("path");
   const os = require("os");
@@ -776,7 +768,10 @@ exports.uploadImage = (req, res) => {
 
   if (req.body.imageUrl) {
     const imageUrl = req.body.imageUrl
-    db.doc(`/users/${req.user.userId}`).update({ imageUrl });
+    await db.doc(`/users/${req.user.userId}`).update({ imageUrl });
+    await db
+      .doc(`/users/${req.user.userId}/digital-cv/${req.user.userId}`)
+      .update({ imageUrl });
     return res.json({ success: "image uploaded successfully" });
   } else {
 
@@ -785,7 +780,7 @@ exports.uploadImage = (req, res) => {
     let imageToBeUploaded = {};
     let imageFileName;
     // String for image token
-    let generatedToken = uuid();
+    let generatedToken = v4();
 
 
     busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
@@ -819,9 +814,12 @@ exports.uploadImage = (req, res) => {
             },
           },
         })
-        .then(() => {
+        .then(async() => {
           // Append token to url
           const imageUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/profile-images%2F${imageFileName}?alt=media&token=${generatedToken}`;
+          await db
+            .doc(`/users/${req.user.userId}/digital-cv/${req.user.userId}`)
+            .update({ imageUrl })
           return db.doc(`/users/${req.user.userId}`).update({ imageUrl });
         })
         .then(() => {
@@ -854,7 +852,7 @@ exports.uploadBackgroundImage = (req, res) => {
     let imageToBeUploaded = {};
     let imageFileName;
     // String for image token
-    let generatedToken = uuid();
+    let generatedToken = v4();
 
 
     busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
@@ -918,10 +916,10 @@ exports.uploadCV = (req, res) => {
   let imageToBeUploaded = {};
   let imageFileName;
   // String for image token
-  let generatedToken = uuid();
+  let generatedToken = v4();
   
 
-  busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
+  busboy.on("file", (_fieldname, file, filename, _encoding, mimetype) => {
     
     if (mimetype !== "application/msword" && mimetype !== "application/pdf"
     && mimetype !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
@@ -1066,7 +1064,7 @@ exports.activateUser = (req, res) => {
             const companyLink = `https://levls.io/company-profile/${req.params.userId}`;
             const userLink = `https://levls.io/profile/${req.params.userId}`;
 
-            var options = {
+            let options = {
               method: 'POST',
               url: `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${config.apiKey}`,
               headers: {
@@ -1454,4 +1452,121 @@ exports.getMyDigitalCV = (req, res) => {
       console.error(err);
       res.status(500).json({ error: 'Something went wrong please try again.' });
     });
+};
+
+exports.addProfileVideo = (req, res) => {
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+  let uploadUrl;
+
+  if (req.body.customUrl || req.body.customUrl === '') {
+    const video = {
+      profileVideo: req.body.customUrl,
+      updatedAt: new Date().toISOString(),
+    };
+    db.doc(`users/${req.user.userId}`)
+      .update(video)
+      .then(async(_doc) => {
+        await db
+              .doc(`users/${req.user.userId}/digital-cv/${req.user.userId}`)
+              .update(newUpload);
+        return res
+          .status(201)
+          .json({ success: 'Profile video successfully updated' });
+      })
+      .catch((err) => {
+        console.log(err);
+        res.status(500).json({ error: 'Something went wrong' });
+      });
+  } else {
+    const busboy = new BusBoy({ headers: req.headers });
+    // const username = req.user.username;
+    const userId = req.user.userId;
+    // const imageUrl = req.user.imageUrl;
+
+    let contentToBeUploaded = {};
+    let uploadFileName;
+    let generatedToken = v4();
+    let newUpload = {};
+
+    busboy.on(
+      'field',
+      function (
+        fieldname,
+        val,
+        _fieldnameTruncated,
+        _valTruncated,
+        _encoding,
+        _mimetype
+      ) {
+        newUpload[fieldname] = val;
+      }
+    );
+
+    busboy.on('file', (_fieldname, file, filename, _encoding, mimetype) => {
+      if (
+        mimetype !== 'video/webm' &&
+        mimetype !== 'video/mp4' &&
+        mimetype !== 'video/swf'
+      ) {
+        return res.status(400).json({ error: 'Wrong file type submitted' });
+      }
+      const contentExtension =
+        filename.split('.')[filename.split('.').length - 1];
+      // 32756238461724837.png
+      uploadFileName = `${Math.round(
+        Math.random() * 1000000000000
+      ).toString()}.${contentExtension}`;
+      const filepath = path.join(os.tmpdir(), path.basename(uploadFileName));
+      contentToBeUploaded = { filepath, mimetype };
+      file.pipe(fs.createWriteStream(filepath));
+    });
+
+    busboy.on('finish', async () => {
+      let promise;
+      uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/uploads%2F${uploadFileName}?alt=media&token=${generatedToken}`;
+      promise = admin
+        .storage()
+        .bucket(config.storageBucket)
+        .upload(contentToBeUploaded.filepath, {
+          destination: `uploads/${uploadFileName}`,
+          resumable: false,
+          metadata: {
+            metadata: {
+              contentType: contentToBeUploaded.mimetype,
+              //Generate token to be appended to imageUrl
+              firebaseStorageDownloadTokens: generatedToken,
+            },
+          },
+        });
+
+      try {
+        await Promise.resolve(promise);
+        newUpload.profileVideo = uploadUrl;
+        newUpload.updatedAt = new Date().toISOString();
+        db.doc(`users/${userId}`)
+          .update(newUpload)
+          .then(async(_doc) => {
+            await db
+              .doc(`users/${userId}/digital-cv/${userId}`)
+              .update(newUpload);
+            return res
+              .status(201)
+              .json({ success: 'Profile video successfully updated' });
+          })
+          .catch((err) => {
+            res
+              .status(500)
+              .json({ error: 'something went wrong with the update' });
+            console.error(err);
+          });
+      } catch (err) {
+        res.status(500).json({ error: 'something went wrong' });
+        console.error(err);
+      }
+    });
+    busboy.end(req.rawBody);
+  }
 };

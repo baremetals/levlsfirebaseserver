@@ -322,9 +322,9 @@ exports.updateSkills = (req, res) => {
     db.doc(`users/${req.user.userId}/skills/${req.params.skillId}`)
       .update(skillDetails)
       .then(async() => {
-        // if (!doc.exists) {
-        //   return res.status(404).json({ error: 'Skill not found' });
-        // }
+        if (!doc.exists) {
+          return res.status(404).json({ error: 'Skill not found' });
+        }
         await db
           .doc(
             `users/${req.user.userId}/digital-cv/${req.params.skillId}`
@@ -340,31 +340,31 @@ exports.updateSkills = (req, res) => {
 
 
 // Interests
-exports.addInterestsOld = (req, res) => {
-  if (req.body.interestList === [])
-    return res.status(400).json({ interestList: 'Must not be empty' });
+// exports.addInterestsOld = (req, res) => {
+//   if (req.body.interestList === [])
+//     return res.status(400).json({ interestList: 'Must not be empty' });
 
-  const newInterest = {
-    interestList: req.body.interestList,
-    otherInterestList: req.body.otherInterestList,
-    createdAt: new Date().toISOString(),
-    username: req.user.username,
-    userId: req.user.userId,
-    userImage: req.user.imageUrl,
-  };
+//   const newInterest = {
+//     interestList: req.body.interestList,
+//     otherInterestList: req.body.otherInterestList,
+//     createdAt: new Date().toISOString(),
+//     username: req.user.username,
+//     userId: req.user.userId,
+//     userImage: req.user.imageUrl,
+//   };
 
-  db.collection(`users/${req.user.userId}/interests`)
-    .add(newInterest)
-    .then((doc) => {
-      const resInterest = newInterest;
-      resInterest.interestId = doc.id;
-      res.json(resInterest);
-    })
-    .catch((err) => {
-      console.log(err);
-      res.status(500).json({ error: 'Something went wrong' });
-    });
-};
+//   db.collection(`users/${req.user.userId}/interests`)
+//     .add(newInterest)
+//     .then((doc) => {
+//       const resInterest = newInterest;
+//       resInterest.interestId = doc.id;
+//       res.json(resInterest);
+//     })
+//     .catch((err) => {
+//       console.log(err);
+//       res.status(500).json({ error: 'Something went wrong' });
+//     });
+// };
 
 exports.addInterests = (req, res) => {
   const interests = req.body.interestList;

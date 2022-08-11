@@ -106,6 +106,7 @@ exports.createAJob = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'job',
       isActive: false,
+      state: 'draft',
       applicantCount: 0,
       pageUrl: `job/${req.body.jobType.toLowerCase()}/${slug}`,
     };

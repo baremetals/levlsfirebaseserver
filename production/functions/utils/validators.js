@@ -144,6 +144,9 @@ exports.reduceUserDetails = (data) => {
     if (data.city.trim() !== '') userDetails.city = data.city;
     if (data.postcode.trim() !== '') userDetails.postcode = data.postcode;
     if (data.country.trim() !== '') userDetails.country = data.country || England;
+    if (data.isCvPrivate !== null || undefined)
+      userDetails.isCvPrivate = data.isCvPrivate;
+    if (data.isCvPrivate === undefined) userDetails.isCvPrivate = true;
     
     return userDetails;
 };
