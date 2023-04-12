@@ -1,6 +1,6 @@
 const { admin, db } = require('../utils/admin');
 const config = require("../utils/database");
-const { uuid } = require('uuidv4');
+const { v4 } = require('uuid');
 const sgMail = require('@sendgrid/mail');
 
 exports.getAllEvents = (_req, res) => {
@@ -83,8 +83,9 @@ exports.createEvent = (req, res) => {
 
   let imageToBeUploaded = {};
   let imageFileName;
-  let generatedToken = uuid();
+  let generatedToken = v4();
   let newEvent = {};
+  let resEvent;
 
   const adminMsg = {
     to: 'admin@levls.io', // recipient
@@ -111,7 +112,7 @@ exports.createEvent = (req, res) => {
     newEvent[fieldname] = val
   });
 
-  busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
+  busboy.on("file", (_fieldname, file, filename, encoding, mimetype) => {
     if (mimetype !== "image/jpeg" && mimetype !== "image/jpg" && mimetype !== "image/png" && mimetype !== "video/mp4" && mimetype !== "video/swf") {
       return res.status(400).json({ error: "Wrong file type submitted" });
     }
@@ -171,13 +172,13 @@ exports.createEvent = (req, res) => {
     newEvent.state = 'draft'
     db.collection('events')
       .add(newEvent)
-      .then((doc) => {
-        const resEvent = newEvent;
+      .then(async(doc) => {
+        resEvent = newEvent;
         resEvent.timelineId = doc.id;
         docId = doc.id
+        await db.doc(`mobile timeline/${docId}`).set(resEvent);
       })
       .then(async () => {
-        await db.doc(`mobile timeline/${docId}`).set(resEvent);
         await sgMail.send(adminMsg);
         return res.status(201).json(resEvent);
       })
@@ -215,39 +216,20 @@ exports.getEvent = (req, res) => {
     });
 };
 
-// Update Event details
-exports.updateEventDetails = (req, res) => {
-  let eventDetails = reduceEventDetails(req.body);
-  const eventDocument = db.doc(`/events/${req.params.eventId}`)
-
-  eventDocument
-    .get()
-    .then((doc) => {
-      if (!doc.exists) {
-        return res.status(404).json({ error: 'Event not found' });
-      }
-      eventDocument.update(eventDetails)
-      return db.doc(`/mobile timeline/${req.params.eventId}`).update(eventDetails);
-      
-    })
-    .then(() => {
-      return res.json({ message: "Event updated successfully" });
-    })
-    .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
-    });
-};
-
 // Delete an event
 exports.deleteEvent = (req, res) => {
   const document = db.doc(`/events/${req.params.eventId}`);
   document
     .get()
-    .then((doc) => {
+    .then(async (doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Event not found' });
       } else {
+          await db
+            .doc(`mobile timeline/${doc.id}`)
+            .get().then(async(dc) => {
+              if (dc.exists) return db.doc(`mobile timeline/${doc.id}`).delete();
+            })
         return document.delete();
       }
     })
@@ -457,5 +439,300 @@ exports.deleteEventComment = (req, res) => {
       return res.status(500).json({ error: err.code });
     });
 }
+
+// Update an event
+exports.updateEventDetailsOld = (req, res) => {
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+
+  if (req.body.eventMediaUrl || req.body.eventMediaUrl === '') {
+    let eventDetails = req.body;
+    const eventDocument = db.doc(`/events/${req.params.eventId}`);
+    eventDocument
+      .get()
+      .then(async (doc) => {
+        if (!doc.exists) {
+          return res.status(404).json({ error: 'Event not found' });
+        }
+        await eventDocument.update(eventDetails);
+        return db.doc(`/mobile timeline/${req.params.eventId}`).get();
+      })
+      .then(async (d) => {
+        if (d.exists)
+          await db
+            .doc(`/mobile timeline/${req.params.eventId}`)
+            .update(eventDetails);
+        return res.json({ message: 'Event updated successfully' });
+      })
+      .catch((err) => {
+        console.error(err);
+        return res.status(500).json({ error: err.code });
+      });
+  } else {
+    const busboy = new BusBoy({ headers: req.headers });
+    let imageToBeUploaded = {};
+    let imageFileName;
+    let generatedToken = v4();
+    let eventDetails = {};
+    const eventId = req.params.eventId;
+
+    busboy.on(
+      'field',
+      function (
+        fieldname,
+        val,
+        _fieldnameTruncated,
+        _valTruncated,
+        _encoding,
+        _mimetype
+      ) {
+        // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
+        eventDetails[fieldname] = val;
+      }
+    );
+
+    busboy.on('file', (_fieldname, file, filename, _encoding, mimetype) => {
+      if (
+        mimetype !== 'image/jpeg' &&
+        mimetype !== 'image/jpg' &&
+        mimetype !== 'image/png' &&
+        mimetype !== 'video/webm' &&
+        mimetype !== 'video/mov' &&
+        mimetype !== 'video/mp4' &&
+        mimetype !== 'video/swf'
+      ) {
+        return res.status(400).json({ error: 'Wrong file type submitted' });
+      }
+      const imageExtension =
+        filename.split('.')[filename.split('.').length - 1];
+      // 32756238461724837.png
+      imageFileName = `${Math.round(
+        Math.random() * 1000000000000
+      ).toString()}.${imageExtension}`;
+      const filepath = path.join(os.tmpdir(), path.basename(imageFileName));
+      imageToBeUploaded = { filepath, mimetype };
+      file.pipe(fs.createWriteStream(filepath));
+
+      admin
+        .storage()
+        .bucket(config.storageBucket)
+        .upload(imageToBeUploaded.filepath, {
+          destination: `events/${imageFileName}`,
+          resumable: false,
+          metadata: {
+            metadata: {
+              contentType: imageToBeUploaded.mimetype,
+              //Generate token to be appended to imageUrl
+              firebaseStorageDownloadTokens: generatedToken,
+            },
+          },
+        })
+        .catch((err) => {
+          res.status(500).json({
+            error: 'Erm... That was strange, please try again later! ',
+          });
+          console.error(err);
+        });
+    });
+
+    busboy.on('finish', () => {
+      const eventMediaUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/events%2F${imageFileName}?alt=media&token=${generatedToken}`;
+      eventDetails.eventMediaUrl = eventMediaUrl;
+      eventDetails.updatedAt = new Date().toISOString();
+      db.doc(`events/${eventId}`)
+        .get()
+        .then(async (doc) => {
+          if (!doc.exists) {
+            return res.status(404).json({ error: 'Event not found' });
+          }
+          await db.doc(`events/${eventId}`).update(eventDetails);
+          return db.doc(`/mobile timeline/${eventId}`).get();
+        })
+        .then(async (d) => {
+          if (d.exists)
+            await db.doc(`/mobile timeline/${eventId}`).update(eventDetails);
+          return res.json({ message: 'Event updated successfully' });
+        })
+        .catch((err) => {
+          res.status(500).json({ error: 'something went wrong' });
+          console.error(err);
+        });
+    });
+    busboy.end(req.rawBody);
+  }
+};
+
+
+exports.updateEventDetails = (req, res) => {
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+
+  if (
+    (req.body.eventMediaUrl || req.body.eventMediaUrl === '') &&
+    !req.body.customUrl
+  ) {
+    let postDetails = req.body;
+    const eventDocument = db.doc(`/events/${req.params.eventId}`);
+    eventDocument
+      .get()
+      .then(async (doc) => {
+        if (!doc.exists) {
+          return res.status(404).json({ error: 'Post not found' });
+        }
+        await eventDocument.update(postDetails);
+        return db.doc(`/mobile timeline/${req.params.eventId}`).get();
+      })
+      .then(async (d) => {
+        if (d.exists)
+          await db
+            .doc(`/mobile timeline/${req.params.eventId}`)
+            .update(postDetails);
+        return res.json({ message: 'Post updated successfully' });
+      })
+      .catch((err) => {
+        console.error(err);
+        return res.status(500).json({ error: err.code });
+      });
+  } else if (
+    (req.body.customUrl || req.body.customUrl === '') &&
+    req.body.eventMediaUrl
+  ) {
+
+    let postDetails = {
+      title: req.body.title,
+      shortDescription: req.body.shortDescription,
+      content: req.body.content,
+      category: req.body.category,
+      eventMediaUrl: req.body.customUrl,
+      updatedAt: new Date().toISOString(),
+      endDate: req.body.endDate || null,
+      start_date: req.body.start_date || null,
+      endTime: req.body.endTime || null,
+      time: req.body.time || null,
+      registerLink: req.body.registerLink || null,
+      website: req.body.website || null,
+      location: req.body.location,
+      // isActive: req.body.isActive,
+      // state: req.body.state,
+    };
+
+    const eventDocument = db.doc(`/events/${req.params.eventId}`);
+    eventDocument
+      .get()
+      .then(async (doc) => {
+        if (!doc.exists) {
+          return res.status(404).json({ error: 'Post not found' });
+        }
+        await eventDocument.update(postDetails);
+        return db.doc(`/mobile timeline/${req.params.eventId}`).get();
+      })
+      .then(async (d) => {
+        if (d.exists)
+          await db
+            .doc(`/mobile timeline/${req.params.eventId}`)
+            .update(postDetails);
+        return res.json({ message: 'Post updated successfully' });
+      })
+      .catch((err) => {
+        console.error(err);
+        return res.status(500).json({ error: err.code });
+      });
+  } else {
+    const busboy = new BusBoy({ headers: req.headers });
+    let imageToBeUploaded = {};
+    let imageFileName;
+    let generatedToken = v4();
+    let postDetails = {};
+    const eventId = req.params.eventId;
+
+    busboy.on(
+      'field',
+      function (
+        fieldname,
+        val,
+        _fieldnameTruncated,
+        _valTruncated,
+        _encoding,
+        _mimetype
+      ) {
+        // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
+        postDetails[fieldname] = val;
+      }
+    );
+
+    busboy.on('file', (_fieldname, file, filename, _encoding, mimetype) => {
+      if (
+        mimetype !== 'image/jpeg' &&
+        mimetype !== 'image/jpg' &&
+        mimetype !== 'image/png' &&
+        mimetype !== 'video/webm' &&
+        mimetype !== 'video/mov' &&
+        mimetype !== 'video/mp4' &&
+        mimetype !== 'video/swf'
+      ) {
+        return res.status(400).json({ error: 'Wrong file type submitted' });
+      }
+      const imageExtension =
+        filename.split('.')[filename.split('.').length - 1];
+      // 32756238461724837.png
+      imageFileName = `${Math.round(
+        Math.random() * 1000000000000
+      ).toString()}.${imageExtension}`;
+      const filepath = path.join(os.tmpdir(), path.basename(imageFileName));
+      imageToBeUploaded = { filepath, mimetype };
+      file.pipe(fs.createWriteStream(filepath));
+
+      admin
+        .storage()
+        .bucket(config.storageBucket)
+        .upload(imageToBeUploaded.filepath, {
+          destination: `events/${imageFileName}`,
+          resumable: false,
+          metadata: {
+            metadata: {
+              contentType: imageToBeUploaded.mimetype,
+              //Generate token to be appended to imageUrl
+              firebaseStorageDownloadTokens: generatedToken,
+            },
+          },
+        })
+        .catch((err) => {
+          res.status(500).json({
+            error: 'Erm... That was strange, please try again later! ',
+          });
+          console.error(err);
+        });
+    });
+
+    busboy.on('finish', () => {
+      const newUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/events%2F${imageFileName}?alt=media&token=${generatedToken}`;
+      postDetails.eventMediaUrl = newUrl;
+      postDetails.updatedAt = new Date().toISOString();
+      db.doc(`events/${eventId}`)
+        .get()
+        .then(async (doc) => {
+          if (!doc.exists) {
+            return res.status(404).json({ error: 'Post not found' });
+          }
+          await db.doc(`events/${eventId}`).update(postDetails);
+          return db.doc(`/mobile timeline/${eventId}`).get();
+        })
+        .then(async (d) => {
+          if (d.exists)
+            await db.doc(`/mobile timeline/${eventId}`).update(postDetails);
+          return res.json({ message: 'Post updated successfully' });
+        })
+        .catch((err) => {
+          res.status(500).json({ error: 'something went wrong' });
+          console.error(err);
+        });
+    });
+    busboy.end(req.rawBody);
+  }
+};
 
 

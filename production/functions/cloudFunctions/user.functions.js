@@ -1,8 +1,14 @@
 const functions = require('firebase-functions');
 const sgMail = require('@sendgrid/mail');
+const axios = require('axios');
 const { db, admin } = require('../utils/admin');
 const config = require('../utils/database');
-const { addToSendgrid } = require('../lib');
+const {
+  addToSendgrid,
+  addUserToStrapi,
+} = require('../lib');
+const client = require('@sendgrid/client');
+client.setApiKey(config.sendgridApi);
 
 exports.verifyEmail = functions
   .region('europe-west2')
@@ -37,6 +43,7 @@ exports.verifyEmail = functions
       });
   });
 
+// add users to sengrid
 exports.addUserToSendgrid = functions
   .region('europe-west2')
   .firestore.document('users/{userId}')
@@ -58,12 +65,13 @@ exports.addUserToSendgrid = functions
         ],
       };
       try {
-        await addToSendgrid(data);
+        const response = await addToSendgrid(data);
+        console.log(response);
       } catch (err) {
         console.log(err);
       }
     } else {
-      const nameArray = user.fullname.split(" ")
+      const nameArray = user.fullname.split(' ');
       const data = {
         list_ids: [config.sendgridOrgList],
         contacts: [
@@ -84,12 +92,44 @@ exports.addUserToSendgrid = functions
         ],
       };
       try {
-        await addToSendgrid(data);
+        const response = await addToSendgrid(data);
+        console.log(response);
       } catch (err) {
         console.log(err);
       }
     }
-});
+  });
+
+
+// add users to strapi backend
+exports.addToStrapi = functions
+  .region('europe-west2')
+  .firestore.document('users/{id}')
+  .onCreate(async (snap, _ctx) => {
+    const user = snap.data();
+    if (user.userType === 'Personal') {      
+      try {
+        await addUserToStrapi(user);
+        await axios({
+          method: 'GET',
+          url: `${config.strapiApi}/candidates?filters[username][$eq]=${user.username}`,
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${config.strapiJwtToken}`,
+          },
+        })
+          .then(async (res) => {
+            const { data } = res.data;
+            return db.doc(`users/${snap.id}`).update({ strapiId: data[0].id });
+          })
+          .catch((err) => {
+            console.log('This is the error: ', err);
+          });
+      } catch (err) {
+        console.log(err);
+      }
+    }
+  });
 
 exports.welcomeEmail = functions
   .region('europe-west2')

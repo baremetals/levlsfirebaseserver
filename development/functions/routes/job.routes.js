@@ -19,14 +19,31 @@ router
   .delete(FBAuth.protect, jobHelper.deleteAJob)
   .post(FBAuth.protect, jobHelper.updateAJob);
 
-// router.route('/job-applications/:jobId')
-//     .post(FBAuth.protect, jobHelper.submitJobApplication)
+router
+  .route('/job-applicant/:id')
+  .get(FBAuth.protectOrgData, jobHelper.getAllApplicantSubmissions)
+  .post(FBAuth.protect, jobHelper.submitApplication);
 
 router
-  .route('/job-cv/:jobId')
-  .post(FBAuth.protect, jobHelper.submitJobCVApplication);
+  .route('/job-submission/:jobId/:userId')
+  .get(FBAuth.protectOrgData, jobHelper.getApplicantSubmission);
 
-// router.route('/job/:jobId/review')
-//     .post(FBAuth.protect, jobHelper.reviewAnJobship)
+router
+  .route('/job-shortlist/:jobId')
+  .get(FBAuth.protectOrgData, jobHelper.getJobShortList)
+  .post(FBAuth.protectOrgData, jobHelper.addApplicantToShortList);
+
+router
+  .route('/job-interviewlist/:jobId')
+  .get(FBAuth.protectOrgData, jobHelper.getJobInterviewList)
+  .post(FBAuth.protectOrgData, jobHelper.addApplicantToInterviewList);
+
+router
+  .route('/job-shortlist/:jobId/:userId')
+  .delete(FBAuth.protectOrgData, jobHelper.removeShortListedApplicant);
+
+router
+  .route('/job-interviewlist/:jobId/:userId')
+  .delete(FBAuth.protectOrgData, jobHelper.removeApplicantFromList);
 
 module.exports = router;

@@ -422,7 +422,7 @@ exports.userUploads = (req, res) => {
     try {
       await Promise.resolve(promise);
       newUpload.uploadUrl = uploadUrl;
-      newUpload.createdAt = new Date().toISOString();
+      newUpload.updatedAt = new Date().toISOString();
       newUpload.post_time_stamp = Date.parse(post_time_stamp)
       newUpload.username = username;
       newUpload.userId = userId;

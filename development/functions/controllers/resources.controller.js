@@ -1,6 +1,6 @@
 const { admin, db } = require('../utils/admin');
 const config = require("../utils/database");
-const { uuid } = require('uuidv4');
+const { v4 } = require('uuid');
 const sgMail = require('@sendgrid/mail');
 
 // Fetch all resources
@@ -181,7 +181,7 @@ exports.createResource = (req, res) => {
 
     let imageToBeUploaded = {};
     let imageFileName;
-    let generatedToken = uuid();
+    let generatedToken = v4();
     let newResource = {};
 
     const adminMsg = {
@@ -529,10 +529,15 @@ exports.deleteResource = (req, res) => {
   const document = db.doc(`/resources/${req.params.resourceId}`);
   document
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Resource not found' });
       } else {
+        await db
+            .doc(`mobile timeline/${doc.id}`)
+            .get().then(async(dc) => {
+              if (dc.exists) return db.doc(`mobile timeline/${doc.id}`).delete();
+            })
         return document.delete();
       }
     })
@@ -548,26 +553,169 @@ exports.deleteResource = (req, res) => {
 
 // Update resource data
 exports.updateResource = (req, res) => {
-  let resourceDetails = req.body;
-  const resourceDocument = db.doc(`/resources/${req.params.resourceId}`)
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
 
-  resourceDocument
-    .get()
-    .then((doc) => {
-      if (!doc.exists) {
-        return res.status(404).json({ error: 'Resource not found' });
+
+  if (
+    (req.body.uploadUrl || req.body.uploadUrl === '') &&
+    !req.body.customUrl
+  ) {
+    let resourceDetails = req.body;
+    const resourceDocument = db.doc(`/resources/${req.params.resourceId}`);
+    resourceDocument
+      .get()
+      .then(async (doc) => {
+        if (!doc.exists) {
+          return res.status(404).json({ error: 'Resource not found' });
+        }
+        await resourceDocument.update(resourceDetails);
+        return db.doc(`/mobile timeline/${req.params.resourceId}`).get();
+      })
+      .then(async (d) => {
+        if (d.exists)
+          await db
+            .doc(`/mobile timeline/${req.params.resourceId}`)
+            .update(resourceDetails);
+        return res.json({ message: 'Resource updated successfully' });
+      })
+      .catch((err) => {
+        console.error(err);
+        return res.status(500).json({ error: err.code });
+      });
+  } else if (
+    (req.body.customUrl || req.body.customUrl === '') &&
+    req.body.uploadUrl
+  ) {
+    let postDetails = {
+      title: req.body.title,
+      shortDescription: req.body.shortDescription,
+      content: req.body.content,
+      resourceType: req.body.resourceType,
+      uploadUrl: req.body.customUrl,
+      updatedAt: new Date().toISOString(),
+      // isActive: req.body.isActive,
+      // state: req.body.state,
+    };
+
+    const resourceDocument = db.doc(`/resources/${req.params.resourceId}`);
+    resourceDocument
+      .get()
+      .then(async (doc) => {
+        if (!doc.exists) {
+          return res.status(404).json({ error: 'Resource not found' });
+        }
+        await resourceDocument.update(postDetails);
+        return db.doc(`/mobile timeline/${req.params.resourceId}`).get();
+      })
+      .then(async (d) => {
+        if (d.exists)
+          await db
+            .doc(`/mobile timeline/${req.params.resourceId}`)
+            .update(postDetails);
+        return res.json({ message: 'Post updated successfully' });
+      })
+      .catch((err) => {
+        console.error(err);
+        return res.status(500).json({ error: err.code });
+      });
+  } else {
+    const busboy = new BusBoy({ headers: req.headers });
+    let imageToBeUploaded = {};
+    let imageFileName;
+    let generatedToken = v4();
+    let resourceDetails = {};
+    const resourceId = req.params.resourceId;
+
+    busboy.on(
+      'field',
+      function (
+        fieldname,
+        val,
+        _fieldnameTruncated,
+        _valTruncated,
+        _encoding,
+        _mimetype
+      ) {
+        // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
+        resourceDetails[fieldname] = val;
       }
-      resourceDocument.update(resourceDetails)
-      return db.doc(`/mobile timeline/${req.params.resourceId}`).update(resourceDetails);
-      
-    })
-    .then(() => {
-      return res.json({ message: "Resource updated successfully" });
-    })
-    .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
+    );
+
+    busboy.on('file', (_fieldname, file, filename, _encoding, mimetype) => {
+      if (
+        mimetype !== 'image/jpeg' &&
+        mimetype !== 'image/jpg' &&
+        mimetype !== 'image/png' &&
+        mimetype !== 'video/webm' &&
+        mimetype !== 'video/mov' &&
+        mimetype !== 'video/mp4' &&
+        mimetype !== 'video/swf'
+      ) {
+        return res.status(400).json({ error: 'Wrong file type submitted' });
+      }
+      const imageExtension =
+        filename.split('.')[filename.split('.').length - 1];
+      // 32756238461724837.png
+      imageFileName = `${Math.round(
+        Math.random() * 1000000000000
+      ).toString()}.${imageExtension}`;
+      const filepath = path.join(os.tmpdir(), path.basename(imageFileName));
+      imageToBeUploaded = { filepath, mimetype };
+      file.pipe(fs.createWriteStream(filepath));
+
+      admin
+        .storage()
+        .bucket(config.storageBucket)
+        .upload(imageToBeUploaded.filepath, {
+          destination: `resources/${imageFileName}`,
+          resumable: false,
+          metadata: {
+            metadata: {
+              contentType: imageToBeUploaded.mimetype,
+              //Generate token to be appended to imageUrl
+              firebaseStorageDownloadTokens: generatedToken,
+            },
+          },
+        })
+        .catch((err) => {
+          res.status(500).json({
+            error: 'Erm... That was strange, please try again later! ',
+          });
+          console.error(err);
+        });
     });
+
+    busboy.on('finish', () => {
+      const uploadUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/resources%2F${imageFileName}?alt=media&token=${generatedToken}`;
+      resourceDetails.uploadUrl = uploadUrl;
+      resourceDetails.updatedAt = new Date().toISOString();
+      db.doc(`resources/${resourceId}`)
+        .get()
+        .then(async (doc) => {
+          if (!doc.exists) {
+            return res.status(404).json({ error: 'Resource not found' });
+          }
+          await db.doc(`resources/${resourceId}`).update(resourceDetails);
+          return db.doc(`/mobile timeline/${resourceId}`).get();
+        })
+        .then(async (d) => {
+          if (d.exists)
+            await db
+              .doc(`/mobile timeline/${resourceId}`)
+              .update(resourceDetails);
+          return res.json({ message: 'Resource updated successfully' });
+        })
+        .catch((err) => {
+          res.status(500).json({ error: 'something went wrong' });
+          console.error(err);
+        });
+    });
+    busboy.end(req.rawBody);
+  }
+
 };
 
 

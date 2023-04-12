@@ -13,6 +13,7 @@ const grantRoutes = require('./routes/grant.routes');
 const aboutUserRoutes = require('./routes/aboutUser.routes');
 const apprenticeRoutes = require('./routes/apprentice.routes');
 const internshipRoutes = require('./routes/internship.routes');
+const jobRoutes = require('./routes/job.routes');
 const sgMail = require('@sendgrid/mail');
 const config = require('./utils/database');
 const cors = require('cors');
@@ -31,6 +32,7 @@ app.use('/', resourcesRoutes);
 app.use('/', grantRoutes);
 app.use('/', apprenticeRoutes);
 app.use('/', internshipRoutes);
+app.use('/', jobRoutes);
 app.use('/', aboutUserRoutes);
 
 sgMail.setApiKey(config.sendgridApi);

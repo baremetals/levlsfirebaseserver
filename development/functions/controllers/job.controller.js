@@ -1,6 +1,7 @@
 const { admin, db } = require('../utils/admin');
 const sgMail = require('@sendgrid/mail');
-const { uuid } = require('uuidv4');
+const { v4 } = require('uuid');
+const config = require('../utils/database');
 
 // Fetch all jobs
 exports.getAllJobs = (req, res) => {
@@ -12,23 +13,24 @@ exports.getAllJobs = (req, res) => {
       let jobs = [];
       data.forEach((doc) => {
         jobs.push({
+          ...doc.data(),
           jobId: doc.id,
-          title: doc.data().title,
-          shortDescription: doc.data().shortDescription,
-          slug: doc.data().slug,
-          content: doc.data().content,
-          location: doc.data().location,
-          username: doc.data().username,
-          userId: doc.data().userId,
-          imageUrl: doc.data().imageUrl,
-          createdAt: doc.data().createdAt,
-          contentType: doc.data().contentType,
-          deadline: doc.data().deadline,
-          organisationName: doc.data().organisationName,
-          applicationLink: doc.data().applicationLink,
-          jobType: doc.data().jobType,
-          isActive: doc.data().isActive,
-          viewsCount: doc.data().viewsCount,
+          // title: doc.data().title,
+          // shortDescription: doc.data().shortDescription,
+          // slug: doc.data().slug,
+          // content: doc.data().content,
+          // location: doc.data().location,
+          // username: doc.data().username,
+          // userId: doc.data().userId,
+          // imageUrl: doc.data().imageUrl,
+          // createdAt: doc.data().createdAt,
+          // contentType: doc.data().contentType,
+          // deadline: doc.data().deadline,
+          // organisationName: doc.data().organisationName,
+          // applicationLink: doc.data().applicationLink,
+          // jobType: doc.data().jobType,
+          // isActive: doc.data().isActive,
+          // viewsCount: doc.data().viewsCount,
         });
       });
 
@@ -96,9 +98,12 @@ exports.createAJob = (req, res) => {
       slug,
       jobType: req.body.jobType,
       location: req.body.location,
+      salary: req.body.salary,
       deadline: req.body.deadline || '',
       howtoApply: req.body.howtoApply,
-      customQuestions: req.body.customQuestions,
+      educationQuestions: req.body.educationQuestions,
+      workQuestions: req.body.workQuestions,
+      additionalQuestions: req.body.additionalQuestions,
       applicationLink: req.body.applicationLink || '',
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
@@ -108,7 +113,7 @@ exports.createAJob = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'job',
       isActive: false,
-      state: 'draft',
+      state: req.body.state || 'draft',
       applicantCount: 0,
       pageUrl: `job/${req.body.jobType.toLowerCase()}/${slug}`,
     };
@@ -186,13 +191,16 @@ exports.updateAJob = (req, res) => {
 
   jobDoc
     .get()
-    .then((doc) => {
+    .then(async(doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Vacancy not found' });
       }
-      jobDoc.update(jobDetails);
-      return db
+      await jobDoc.update(jobDetails);
+      await db
         .doc(`/opportunities/${req.params.jobId}`)
+        .update(jobDetails);
+      await db
+        .doc(`/mobile timeline/${req.params.jobId}`)
         .update(jobDetails);
     })
     .then(() => {
@@ -204,113 +212,79 @@ exports.updateAJob = (req, res) => {
     });
 };
 
-
-exports.submitJobCVApplication = (req, res) => {
+exports.submitApplication = (req, res) => {
+  const itemCollection = db.collection(
+    `jobs/${req.params.id}/submissions`
+  );
   const BusBoy = require('busboy');
   const path = require('path');
   const os = require('os');
   const fs = require('fs');
 
-  const apprenticeshipDocument = db.doc(
-    `apprenticeships/${req.params.apprenticeshipId}`
-  );
-  let apprenticeshipData;
+  const busboy = new BusBoy({ headers: req.headers });
 
-  const apprenticeshipId = req.params.apprenticeshipId;
-  const userId = req.user.userId;
-  const username = req.user.username;
-  const imageUrl = req.user.imageUrl;
-  const fullname = req.user.fullname;
+  const jobDocument = db.doc(`jobs/${req.params.id}`);
 
-  let organisationName;
-  let apprenticeshipHostUserId;
-  let apprenticeshipTitle;
-  // let apprenticeshipType;
-
-  let newAppilcation = {
-    cvLink: req.body.cvLink,
-    apprenticeshipId: apprenticeshipId,
-    applicantFullname: fullname,
-    applicantUsername: username,
-    applicantImageUrl: imageUrl,
-    applicantUserId: userId,
-    applicationType: 'funding',
-    createdAt: new Date().toISOString(),
-  };
-
-  let newApplicant = {};
-
-  apprenticeshipDocument
+  itemCollection
+    .doc(req.user.userId)
     .get()
     .then((doc) => {
       if (doc.exists) {
-        apprenticeshipData = doc.data();
-        apprenticeshipData.apprenticeshipId = doc.id;
-        apprenticeshipHostUserId = apprenticeshipData.userId;
-        apprenticeshipTitle = apprenticeshipData.title;
-        // apprenticeshipType = apprenticeshipData.apprenticeshipType
-        organisationName = apprenticeshipData.organisationName;
-      } else return res.status(404).json({ error: 'Grant document not found' });
-    })
-    .then(() => {
-      if (req.body.cvLink) {
-        newAppilcation.apprenticeshipHostUserId = apprenticeshipHostUserId;
-        newAppilcation.apprenticeshipTitle = apprenticeshipTitle;
-        // newAppilcation.apprenticeshipType = apprenticeshipType
-        newAppilcation.organisationName = organisationName;
-
-        db.doc(
-          `apprenticeships/${req.params.apprenticeshipId}/submissions/${userId}`
-        )
-          .set(newAppilcation)
-          .then(() => {
-            apprenticeshipData.applicantCount++;
-            return apprenticeshipDocument.update({
-              applicantCount: apprenticeshipData.applicantCount,
-            });
-          })
-          .then(() => {
-            return res
-              .status(201)
-              .json({ succes: 'Your application was submitted succesfully' });
-          })
-          .catch((err) => {
-            res.status(500).json({ error: 'something went wrong' });
-            console.error(err);
-          });
+        return res.status(500).json({
+          error: 'You have already submitted an application',
+        });
       } else {
-        const busboy = new BusBoy({ headers: req.headers });
-        let imageToBeUploaded = {};
-        let imageFileName;
-        let generatedToken = uuid();
+        let jobData;
+        const jobId = req.params.id;
+        const userId = req.user.userId;
+        const username = req.user.username;
+        const imageUrl = req.user.imageUrl;
+
+        let imagesToBeUploaded = [];
+        let imageFileName = {};
+        let generatedToken = v4();
+        let imageToAdd = {};
+        let uploadUrls = [];
+        let newAppilcation = {};
+        let organisationId;
+        let jobTitle;
+        let jobType;
 
         busboy.on(
           'field',
           function (
             fieldname,
             val,
-            fieldnameTruncated,
-            valTruncated,
-            encoding,
-            mimetype
+            _fieldnameTruncated,
+            _valTruncated,
+            _encoding,
+            _mimetype
           ) {
-            newApplicant[fieldname] = val;
+            newAppilcation[fieldname] = val;
           }
         );
 
-        busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
+        busboy.on('file', (fieldname, file, filename, _encoding, mimetype) => {
           if (
+            mimetype !== 'image/jpeg' &&
+            mimetype !== 'image/jpg' &&
+            mimetype !== 'image/png' &&
+            mimetype !== 'image/gif' &&
+            mimetype !== 'audio/webm' &&
+            mimetype !== 'audio/mp3' &&
+            mimetype !== 'audio/wav' &&
+            mimetype !== 'video/webm' &&
+            mimetype !== 'video/mp4' &&
+            mimetype !== 'video/swf' &&
+            mimetype !== 'video/mov' &&
             mimetype !== 'application/msword' &&
             mimetype !== 'application/pdf' &&
+            mimetype !== 'text/csv' &&
+            mimetype !== 'video/mpeg' &&
             mimetype !==
               'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
           ) {
-            return res
-              .status(400)
-              .json({
-                error:
-                  'Wrong file type submitted. Only word and pdf files allowed',
-              });
+            return res.status(400).json({ error: 'Wrong file type submitted' });
           }
           const imageExtension =
             filename.split('.')[filename.split('.').length - 1];
@@ -319,70 +293,412 @@ exports.submitJobCVApplication = (req, res) => {
             Math.random() * 1000000000000
           ).toString()}.${imageExtension}`;
           const filepath = path.join(os.tmpdir(), path.basename(imageFileName));
-          imageToBeUploaded = { filepath, mimetype };
-          file.pipe(fs.createWriteStream(filepath));
 
-          admin
-            .storage()
-            .bucket(config.storageBucket)
-            .upload(imageToBeUploaded.filepath, {
-              destination: `user-cv/${imageFileName}`,
-              resumable: false,
-              metadata: {
-                metadata: {
-                  contentType: imageToBeUploaded.mimetype,
-                  //Generate token to be appended to imageUrl
-                  firebaseStorageDownloadTokens: generatedToken,
-                },
-              },
-            })
-            .catch((err) => {
-              res
-                .status(500)
-                .json({
-                  error: 'Erm... That was strange, please try again later! ',
-                });
-              console.error(err);
-            });
+          imageToAdd = {
+            imageFileName,
+            filepath,
+            mimetype,
+            fieldname,
+          };
+          file.pipe(fs.createWriteStream(filepath));
+          imagesToBeUploaded.push(imageToAdd);
         });
 
-        busboy.on('finish', () => {
-          const CV = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/user-cv%2F${imageFileName}?alt=media&token=${generatedToken}`;
-          newApplicant.cvLink = CV;
-          newApplicant.apprenticeshipId = apprenticeshipId;
-          newApplicant.applicantUsername = username;
-          newApplicant.applicantImageUrl = imageUrl;
-          newApplicant.applicantUserId = userId;
-          newApplicant.applicationType = 'funding';
-          newApplicant.createdAt = new Date().toISOString();
-          newApplicant.apprenticeshipHostUserId = apprenticeshipHostUserId;
-          newApplicant.apprenticeshipTitle = apprenticeshipTitle;
-          // newApplicant.apprenticeshipType = apprenticeshipType
-          newApplicant.organisationName = organisationName;
+        busboy.on('finish', async () => {
+          let promises = [];
 
-          db.doc(
-            `apprenticeships/${req.params.apprenticeshipId}/submissions/${userId}`
-          )
-            .set(newApplicant)
-            .then(() => {
-              apprenticeshipData.applicantCount++;
-              return apprenticeshipDocument.update({
-                applicantCount: apprenticeshipData.applicantCount,
-              });
-            })
-            .then(() => {
-              db.doc(`/users/${userId}`).update({ CV });
-              return res
-                .status(201)
-                .json({ succes: 'Your application was submitted succesfully' });
-            })
-            .catch((err) => {
-              res.status(500).json({ error: 'something went wrong' });
-              console.error(err);
+          imagesToBeUploaded.forEach((uploads) => {
+            const type = uploads.fieldname;
+            uploadUrls.push({
+              type,
+              url: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/application-uploads%2F${uploads.imageFileName}?alt=media&token=${generatedToken}`,
             });
+
+            promises.push(
+              admin
+                .storage()
+                .bucket(config.storageBucket)
+                .upload(uploads.filepath, {
+                  destination: `application-uploads/${uploads.imageFileName}`,
+                  resumable: false,
+                  metadata: {
+                    metadata: {
+                      contentType: uploads.mimetype,
+                      //Generate token to be appended to imageUrl
+                      firebaseStorageDownloadTokens: generatedToken,
+                    },
+                  },
+                })
+            );
+          });
+
+          try {
+            await Promise.all(promises);
+            jobDocument
+              .get()
+              .then((dc) => {
+                if (dc.exists) {
+                  jobData = dc.data();
+                  jobData.jobId = dc.id;
+                  organisationId = jobData.userId;
+                  jobTitle = jobData.title;
+                  jobType = jobData.jobType;
+                } else {
+                  return res
+                    .status(404)
+                    .json({ error: 'Job details not found' });
+                }
+              })
+              .then(() => {
+                const uploadUrl = uploadUrls;
+                newAppilcation.uploadUrl = uploadUrl;
+                newAppilcation.applicantUserId = userId;
+                newAppilcation.applicantUsername = username;
+                newAppilcation.applicantImageUrl = imageUrl;
+                newAppilcation.applicationType = 'job';
+                newAppilcation.jobId = jobId;
+                newAppilcation.createdAt = new Date().toISOString();
+                newAppilcation.organisationId = organisationId;
+                newAppilcation.jobTitle = jobTitle;
+                newAppilcation.jobType = jobType;
+
+                db.doc(`jobs/${req.params.id}/submissions/${userId}`)
+                  .set(newAppilcation)
+                  .then(() => {
+                    jobData.applicantCount++;
+                    return jobDocument.update({
+                      applicantCount: jobData.applicantCount,
+                    });
+                  })
+                  .catch((err) => {
+                    res.status(500).json({ error: 'something went wrong' });
+                    console.error(err);
+                  });
+              });
+
+            return res.status(200).json({
+              success: `Your application has been submitted`,
+            });
+          } catch (err) {
+            console.log(err);
+            res.status(500).json(err);
+          }
         });
 
         busboy.end(req.rawBody);
       }
+    })
+    .catch((err) => {
+      console.error(err);
+      return res
+        .status(500)
+        .json({ error: 'Something went wrong please try again later.' });
+    });
+};
+
+// Fetch all submissions
+exports.getAllApplicantSubmissions = (req, res) => {
+  db.doc(`jobs/${req.params.id}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res.status(500).json({ error: 'permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .collection(`jobs/${req.params.id}/submissions`)
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let submissions = [];
+          let questions = [];
+          data.forEach((doc) => {
+            const addQ = JSON.parse(doc.data().additionalQuestions);
+            const edQ = JSON.parse(doc.data().additionalQuestions);
+            const wrkQ = JSON.parse(doc.data().additionalQuestions);
+            addQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            edQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            wrkQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            submissions.push({
+              additionalQuestions: JSON.parse(doc.data().additionalQuestions),
+              address: doc.data().address,
+              applicantImageUrl: doc.data().applicantImageUrl,
+              applicantUserId: doc.data().applicantUserId,
+              applicantUsername: doc.data().applicantUsername,
+              applicationType: doc.data().applicationType,
+              jobId: doc.data().jobId,
+              jobTitle: doc.data().jobTitle,
+              cityOrTown: doc.data().cityOrTown,
+              createdAt: doc.data().createdAt,
+              dateOfBirth: doc.data().dateOfBirth,
+              educationQuestions: JSON.parse(doc.data().educationQuestions),
+              email: doc.data().email,
+              jobType: doc.data().jobType,
+              mobile: doc.data().mobile,
+              name: doc.data().name,
+              organisationId: doc.data().organisationId,
+              postCode: doc.data().postCode,
+              preferredName: doc.data().preferredName,
+              pronouns: doc.data().pronouns,
+              referredBy: doc.data().referredBy,
+              uploadUrls: doc.data().uploadUrl,
+              workQuestions: JSON.parse(doc.data().workQuestions),
+              questions,
+            });
+          });
+          return res.json(submissions);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+// Fetch one submissions
+exports.getApplicantSubmission = (req, res) => {
+  let submissionData;
+  db.doc(`jobs/${req.params.jobId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().organisationId !== req.user.userId) {
+        return res.status(500).json({ error: 'Permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .doc(
+          `jobs/${req.params.jobId}/submissions/${req.params.userId}`
+        )
+        .get()
+        .then((doc) => {
+          if (!doc.exists) {
+            return res.status(401).json({ error: 'Submission not found' });
+          }
+          submissionData = doc.data();
+          return res.status(201).json(submissionData);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+// add a candidate to the shortlist
+exports.addApplicantToShortList = (req, res) => {
+  const userSubmissionData = req.body;
+  const jobDoc = db.doc(
+    `/jobs/${req.params.jobId}`
+  );
+
+  jobDoc
+    .get()
+    .then(async (result) => {
+      if (!result.exists) {
+        return res.status(400).json({ error: 'Job not found' });
+      }
+      await db
+        .doc(
+          `/jobs/${req.params.jobId}/shortlist/${req.body.applicantUserId}`
+        )
+        .set({ ...userSubmissionData, createdAt: new Date().toISOString() });
+      return res.status(201).json({ success: 'Candidate added to shortlist' });
+    })
+    .catch((err) => {
+      console.error(err);
+      res
+        .status(500)
+        .json({ error: 'Something went wrong please try again later.' });
+    });
+};
+
+// add a candidate to the shortlist
+exports.addApplicantToInterviewList = (req, res) => {
+  const userSubmissionData = req.body;
+  const jobDoc = db.doc(
+    `/jobs/${req.params.jobId}`
+  );
+
+  jobDoc
+    .get()
+    .then(async (result) => {
+      if (!result.exists) {
+        return res.status(400).json({ error: 'Job not found' });
+      }
+      await db
+        .doc(
+          `/jobs/${req.params.jobId}/interview-list/${req.body.applicantUserId}`
+        )
+        .set({ ...userSubmissionData, createdAt: new Date().toISOString() });
+      return res
+        .status(201)
+        .json({ success: 'Candidate added to interview list' });
+    })
+    .catch((err) => {
+      console.error(err);
+      res
+        .status(500)
+        .json({ error: 'Something went wrong please try again later.' });
+    });
+};
+
+exports.getJobShortList = (req, res) => {
+  db.doc(`jobs/${req.params.jobId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res.status(500).json({ error: 'permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .collection(`jobs/${req.params.jobId}/shortlist`)
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let shortlist = [];
+          // let questions = [];
+          data.forEach((doc) => {
+            shortlist.push(doc.data());
+          });
+          return res.json(shortlist);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+exports.getJobInterviewList = (req, res) => {
+  db.doc(`jobs/${req.params.jobId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res.status(500).json({ error: 'permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .collection(
+          `jobs/${req.params.jobId}/interview-list`
+        )
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let interviewList = [];
+          // let questions = [];
+          data.forEach((doc) => {
+            interviewList.push(
+              doc.data()
+            );
+          });
+          return res.json(interviewList);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+exports.removeShortListedApplicant = (req, res) => {
+  const document = db.doc(
+    `/jobs/${req.params.jobId}/shortlist/${req.params.userId}`
+  );
+  document
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: 'Candidate not found not found' });
+      } else {
+        return document.delete();
+      }
+    })
+    .then(() => {
+      res.json({ message: 'The Candidate removed' });
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+};
+
+exports.removeApplicantFromList = (req, res) => {
+  const document = db.doc(
+    `/jobs/${req.params.jobId}/interview-list/${req.params.userId}`
+  );
+  document
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: 'Candidate not found not found' });
+      } else {
+        return document.delete();
+      }
+    })
+    .then(() => {
+      res.json({ message: 'The Candidate removed' });
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
     });
 };

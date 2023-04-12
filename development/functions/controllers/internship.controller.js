@@ -1,6 +1,8 @@
 const { admin, db } = require('../utils/admin');
 const sgMail = require('@sendgrid/mail');
-const { uuid } = require('uuidv4');
+const { v4 } = require('uuid');
+const config = require('../utils/database');
+
 // Fetch all internships
 exports.getAllInternships = (req, res) => {
   db.collection('internships')
@@ -27,7 +29,14 @@ exports.getAllInternships = (req, res) => {
           jobType: doc.data().jobType,
           deadline: doc.data().deadline,
           isActive: doc.data().isActive,
+          state: doc.data().state,
           viewsCount: doc.data().viewsCount,
+          educationQuestions: doc.data().educationQuestions,
+          workQuestions: doc.data().workQuestions,
+          additionalQuestions: doc.data().additionalQuestions,
+          salary: doc.data().salary,
+          pageUrl: doc.data().pageUrl,
+          howtoApply: doc.data().howtoApply,
         });     
       });     
       return res.json(internships);
@@ -91,10 +100,13 @@ exports.createAnInternship = (req, res) => {
       slug,
       jobType: req.body.jobType,
       location: req.body.location,
+      salary: req.body.salary,
       deadline: req.body.deadline || '',
       applicationLink: req.body.applicationLink || '',
-      howtoApply: req.body.howtoApply || '',
-      customQuestions: req.body.customQuestions,
+      howtoApply: req.body.howtoApply,
+      educationQuestions: req.body.educationQuestions,
+      workQuestions: req.body.workQuestions,
+      additionalQuestions: req.body.additionalQuestions,
       createdAt: new Date().toISOString(),
       post_time_stamp: Date.parse(post_time_stamp),
       username: req.user.username,
@@ -103,7 +115,7 @@ exports.createAnInternship = (req, res) => {
       organisationName: req.user.organisationName,
       contentType: 'internship',
       isActive: false,
-      state: 'draft',
+      state: req.body.state || 'draft',
       applicantCount: 0,
       pageUrl: `internship/${req.body.jobType.toLowerCase()}/${slug}`,
     };
@@ -303,7 +315,7 @@ exports.submitInternCVApplication = (req, res) => {
         const busboy = new BusBoy({ headers: req.headers });
         let imageToBeUploaded = {};
         let imageFileName;
-        let generatedToken = uuid();
+        let generatedToken = v4();
 
         busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
           newApplicant[fieldname] = val
@@ -378,3 +390,493 @@ exports.submitInternCVApplication = (req, res) => {
       }
     }) 
 }
+
+exports.submitInternApplication = (req, res) => {
+  const itemCollection = db.collection(
+    `internships/${req.params.id}/submissions`
+  );
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+
+  const busboy = new BusBoy({ headers: req.headers });
+
+  const internshipDocument = db.doc(`internships/${req.params.id}`);
+
+  itemCollection
+    .doc(req.user.userId)
+    .get()
+    .then((doc) => {
+      if (doc.exists) {
+        return res.status(500).json({
+          error: 'You have already submitted an application',
+        });
+      } else {
+        let internshipData;
+        const internshipId = req.params.id;
+        const userId = req.user.userId;
+        const username = req.user.username;
+        const imageUrl = req.user.imageUrl;
+
+        let imagesToBeUploaded = [];
+        let imageFileName = {};
+        let generatedToken = v4();
+        let imageToAdd = {};
+        let uploadUrls = [];
+        let newAppilcation = {};
+        let organisationId;
+        let internshipTitle;
+        let jobType;
+
+        busboy.on(
+          'field',
+          function (
+            fieldname,
+            val,
+            _fieldnameTruncated,
+            _valTruncated,
+            _encoding,
+            _mimetype
+          ) {
+            newAppilcation[fieldname] = val;
+          }
+        );
+
+        busboy.on('file', (fieldname, file, filename, _encoding, mimetype) => {
+          if (
+            mimetype !== 'image/jpeg' &&
+            mimetype !== 'image/jpg' &&
+            mimetype !== 'image/png' &&
+            mimetype !== 'image/gif' &&
+            mimetype !== 'audio/webm' &&
+            mimetype !== 'audio/mp3' &&
+            mimetype !== 'audio/wav' &&
+            mimetype !== 'video/webm' &&
+            mimetype !== 'video/mp4' &&
+            mimetype !== 'video/swf' &&
+            mimetype !== 'video/mov' &&
+            mimetype !== 'application/msword' &&
+            mimetype !== 'application/pdf' &&
+            mimetype !== 'text/csv' &&
+            mimetype !== 'video/mpeg' &&
+            mimetype !==
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          ) {
+            return res.status(400).json({ error: 'Wrong file type submitted' });
+          }
+          const imageExtension =
+            filename.split('.')[filename.split('.').length - 1];
+          // 32756238461724837.png
+          imageFileName = `${Math.round(
+            Math.random() * 1000000000000
+          ).toString()}.${imageExtension}`;
+          const filepath = path.join(os.tmpdir(), path.basename(imageFileName));
+
+          imageToAdd = {
+            imageFileName,
+            filepath,
+            mimetype,
+            fieldname,
+          };
+          file.pipe(fs.createWriteStream(filepath));
+          imagesToBeUploaded.push(imageToAdd);
+        });
+
+        busboy.on('finish', async () => {
+          let promises = [];
+
+          imagesToBeUploaded.forEach((uploads) => {
+            const type = uploads.fieldname;
+            uploadUrls.push({
+              type,
+              url: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/application-uploads%2F${uploads.imageFileName}?alt=media&token=${generatedToken}`,
+            });
+
+            promises.push(
+              admin
+                .storage()
+                .bucket(config.storageBucket)
+                .upload(uploads.filepath, {
+                  destination: `application-uploads/${uploads.imageFileName}`,
+                  resumable: false,
+                  metadata: {
+                    metadata: {
+                      contentType: uploads.mimetype,
+                      //Generate token to be appended to imageUrl
+                      firebaseStorageDownloadTokens: generatedToken,
+                    },
+                  },
+                })
+            );
+          });
+
+          try {
+            await Promise.all(promises);
+            internshipDocument
+              .get()
+              .then((dc) => {
+                if (dc.exists) {
+                  internshipData = dc.data();
+                  internshipData.internshipId = dc.id;
+                  organisationId = internshipData.userId;
+                  internshipTitle = internshipData.title;
+                  jobType = internshipData.jobType;
+                } else {
+                  return res
+                    .status(404)
+                    .json({ error: 'Internship details not found' });
+                }
+              })
+              .then(() => {
+                const uploadUrl = uploadUrls;
+                newAppilcation.uploadUrl = uploadUrl;
+                newAppilcation.applicantUserId = userId;
+                newAppilcation.applicantUsername = username;
+                newAppilcation.applicantImageUrl = imageUrl;
+                newAppilcation.applicationType = 'internship';
+                newAppilcation.internshipId = internshipId;
+                newAppilcation.createdAt = new Date().toISOString();
+                newAppilcation.organisationId = organisationId;
+                newAppilcation.internshipTitle = internshipTitle;
+                newAppilcation.jobType = jobType;
+
+                db.doc(`internships/${req.params.id}/submissions/${userId}`)
+                  .set(newAppilcation)
+                  .then(() => {
+                    internshipData.applicantCount++;
+                    return internshipDocument.update({
+                      applicantCount: internshipData.applicantCount,
+                    });
+                  })
+                  .catch((err) => {
+                    res.status(500).json({ error: 'something went wrong' });
+                    console.error(err);
+                  });
+              });
+
+            return res.status(200).json({
+              success: `Your application has been submitted`,
+            });
+          } catch (err) {
+            console.log(err);
+            res.status(500).json(err);
+          }
+        });
+
+        busboy.end(req.rawBody);
+      }
+    })
+    .catch((err) => {
+      console.error(err);
+      return res
+        .status(500)
+        .json({ error: 'Something went wrong please try again later.' });
+    });
+};
+
+// Fetch all submissions
+exports.getAllInternSubmissions = (req, res) => {
+  db.doc(`internships/${req.params.id}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res.status(500).json({ error: 'permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .collection(`internships/${req.params.id}/submissions`)
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let submissions = [];
+          let questions = [];
+          data.forEach((doc) => {
+            const addQ = JSON.parse(doc.data().additionalQuestions);
+            const edQ = JSON.parse(doc.data().additionalQuestions);
+            const wrkQ = JSON.parse(doc.data().additionalQuestions);
+            addQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            edQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            wrkQ.forEach((dc) => {
+              questions.push(dc);
+            });
+            submissions.push({
+              additionalQuestions: JSON.parse(doc.data().additionalQuestions),
+              address: doc.data().address,
+              applicantImageUrl: doc.data().applicantImageUrl,
+              applicantUserId: doc.data().applicantUserId,
+              applicantUsername: doc.data().applicantUsername,
+              applicationType: doc.data().applicationType,
+              internshipId: doc.data().internshipId,
+              internshipTitle: doc.data().internshipTitle,
+              cityOrTown: doc.data().cityOrTown,
+              createdAt: doc.data().createdAt,
+              dateOfBirth: doc.data().dateOfBirth,
+              educationQuestions: JSON.parse(doc.data().educationQuestions),
+              email: doc.data().email,
+              jobType: doc.data().jobType,
+              mobile: doc.data().mobile,
+              name: doc.data().name,
+              organisationId: doc.data().organisationId,
+              postCode: doc.data().postCode,
+              preferredName: doc.data().preferredName,
+              pronouns: doc.data().pronouns,
+              referredBy: doc.data().referredBy,
+              uploadUrls: doc.data().uploadUrl,
+              workQuestions: JSON.parse(doc.data().workQuestions),
+              questions,
+            });
+          });
+          return res.json(submissions);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+// Fetch one submissions
+exports.getOneInternSubmission = (req, res) => {
+  let submissionData;
+  db.doc(`internships/${req.params.internshipId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().organisationId !== req.user.userId) {
+        return res.status(500).json({ error: 'Permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .doc(
+          `internships/${req.params.internshipId}/submissions/${req.params.userId}`
+        )
+        .get()
+        .then((doc) => {
+          if (!doc.exists) {
+            return res.status(401).json({ error: 'Submission not found' });
+          }
+          submissionData = doc.data();
+          return res.status(201).json(submissionData);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+// add a candidate to the shortlist
+exports.addInternCandidateToShortList = (req, res) => {
+  const userSubmissionData = req.body;
+  const internshipDoc = db.doc(
+    `/internships/${req.params.internshipId}`
+  );
+
+  internshipDoc
+    .get()
+    .then(async (result) => {
+      if (!result.exists) {
+        return res.status(400).json({ error: 'Internship not found' });
+      }
+      await db
+        .doc(
+          `/internships/${req.params.internshipId}/shortlist/${req.body.applicantUserId}`
+        )
+        .set({ ...userSubmissionData, createdAt: new Date().toISOString() });
+      return res.status(201).json({ success: 'Candidate added to shortlist' });
+    })
+    .catch((err) => {
+      console.error(err);
+      res
+        .status(500)
+        .json({ error: 'Something went wrong please try again later.' });
+    });
+};
+
+// add a candidate to the shortlist
+exports.addInternCandidateToInterviewList = (req, res) => {
+  const userSubmissionData = req.body;
+  const internshipDoc = db.doc(
+    `/internships/${req.params.internshipId}`
+  );
+
+  internshipDoc
+    .get()
+    .then(async (result) => {
+      if (!result.exists) {
+        return res.status(400).json({ error: 'Internship not found' });
+      }
+      await db
+        .doc(
+          `/internships/${req.params.internshipId}/interview-list/${req.body.applicantUserId}`
+        )
+        .set({ ...userSubmissionData, createdAt: new Date().toISOString() });
+      return res
+        .status(201)
+        .json({ success: 'Candidate added to interview list' });
+    })
+    .catch((err) => {
+      console.error(err);
+      res
+        .status(500)
+        .json({ error: 'Something went wrong please try again later.' });
+    });
+};
+
+exports.getAllShortListedInternCandidates = (req, res) => {
+  db.doc(`internships/${req.params.internshipId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res.status(500).json({ error: 'permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .collection(`internships/${req.params.internshipId}/shortlist`)
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let shortlist = [];
+          // let questions = [];
+          data.forEach((doc) => {
+            shortlist.push(doc.data());
+          });
+          return res.json(shortlist);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+exports.getInternInterviewList = (req, res) => {
+  db.doc(`internships/${req.params.internshipId}`)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().userId !== req.user.userId) {
+        return res.status(500).json({ error: 'permission Denied' });
+      }
+    })
+    .then(async () => {
+      return db
+        .collection(
+          `internships/${req.params.internshipId}/interview-list`
+        )
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then((data) => {
+          if (data.empty) {
+            return res.status(201).json([]);
+          }
+          let interviewList = [];
+          data.forEach((doc) => {
+            interviewList.push(
+              doc.data()
+            );
+          });
+          return res.json(interviewList);
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(500).json({
+            error:
+              'Something went wrong fetching the submissions please try again later.',
+          });
+        });
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error:
+          'Something went wrong fetching the document please try again later.',
+      });
+    });
+};
+
+exports.removeShortListedInternCandidate = (req, res) => {
+  const document = db.doc(
+    `/internships/${req.params.internshipId}/shortlist/${req.params.userId}`
+  );
+  document
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: 'Candidate not found not found' });
+      } else {
+        return document.delete();
+      }
+    })
+    .then(() => {
+      res.json({ message: 'The Candidate removed' });
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+};
+
+exports.removeInternFromInterviewList = (req, res) => {
+  const document = db.doc(
+    `/internships/${req.params.internshipId}/interview-list/${req.params.userId}`
+  );
+  document
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: 'Candidate not found not found' });
+      } else {
+        return document.delete();
+      }
+    })
+    .then(() => {
+      res.json({ message: 'The Candidate removed' });
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+};

@@ -1,6 +1,6 @@
 const { admin, db, firebase, defaultAuth } = require('../utils/admin');
 const config = require('../utils/database');
-const { v4: uuidv4 } = require('uuid');
+const { v4 } = require('uuid');
 const sgMail = require('@sendgrid/mail');
 const request = require('request');
 
@@ -63,6 +63,7 @@ exports.register = (req, res) => {
   const noImg = 'default.jpg';
   const bkgImage = 'background.jpg';
   let userId, uid;
+  let profileUrl;
 
   if (!valid) {
     return res.status(400).json(errors);
@@ -87,8 +88,6 @@ exports.register = (req, res) => {
           .then((userRecord) => {
             userId = userRecord.uid;
             uid = userRecord.uid;
-          })
-          .then(async () => {
             const userCredentials = {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
@@ -125,12 +124,36 @@ exports.register = (req, res) => {
               tiktok: '',
               twitter: '',
               linkedIn: '',
-              profileUrl: '',
               signUpCode: newOrg.signUpCode,
               referral: newOrg.referral,
               purpose: newOrg.purpose,
             };
-            await db.doc(`/users/${userId}`).set(userCredentials);
+            const companyLink = `https://levls.io/company-profile/${userId}`;
+            let options = {
+              method: 'POST',
+              url: `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${config.apiKey}`,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                dynamicLinkInfo: {
+                  domainUriPrefix: 'https://levlsapp.page.link',
+                  link: companyLink,
+                  androidInfo: {
+                    androidPackageName: 'com.pandabares.justappli',
+                  },
+                },
+              }),
+            };
+            request(options, async function (error, response) {
+              if (error) throw new Error(error);
+              const data = JSON.parse(response.body);
+              profileUrl = data.shortLink ? data.shortLink : companyLink;
+              await db.doc(`/users/${userId}`).set({...userCredentials, profileUrl});
+            });
+            
+          })
+          .then(async () => {
             await db
               .doc(`users/${userId}/followings/${config.levlsUserId}`)
               .set({

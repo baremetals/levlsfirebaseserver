@@ -521,10 +521,16 @@ exports.deleteResource = (req, res) => {
   const document = db.doc(`/resources/${req.params.resourceId}`);
   document
     .get()
-    .then((doc) => {
+    .then(async (doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Resource not found' });
       } else {
+        await db
+          .doc(`mobile timeline/${doc.id}`)
+          .get()
+          .then(async (dc) => {
+            if (dc.exists) return db.doc(`mobile timeline/${doc.id}`).delete();
+          });
         return document.delete();
       }
     })
@@ -540,20 +546,23 @@ exports.deleteResource = (req, res) => {
 // Update resource data
 exports.updateResource = (req, res) => {
   let resourceDetails = req.body;
-  const resourceDocument = db.doc(`/resources/${req.params.resourceId}`)
+  const resourceDocument = db.doc(`/resources/${req.params.resourceId}`);
 
   resourceDocument
     .get()
-    .then((doc) => {
+    .then(async (doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Resource not found' });
       }
-      resourceDocument.update(resourceDetails)
-      return db.doc(`/mobile timeline/${req.params.resourceId}`).update(resourceDetails);
-      
+      await resourceDocument.update(resourceDetails);
+      return db.doc(`/mobile timeline/${req.params.resourceId}`).get();
     })
-    .then(() => {
-      return res.json({ message: "Resource updated successfully" });
+    .then(async (d) => {
+      if (d.exists)
+        await db
+          .doc(`/mobile timeline/${req.params.resourceId}`)
+          .update(resourceDetails);
+      return res.json({ message: 'Resource updated successfully' });
     })
     .catch((err) => {
       console.error(err);

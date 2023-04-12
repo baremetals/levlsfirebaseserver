@@ -27,6 +27,7 @@ exports.getAllApprenticeships = (req, res) => {
           deadline: doc.data().deadline,
           organisationName: doc.data().organisationName,
           applicationLink: doc.data().applicationLink,
+          applicantCount: doc.data().applicantCount,
           jobType: doc.data().jobType,
           isActive: doc.data().isActive,
           viewsCount: doc.data().viewsCount,
@@ -422,6 +423,7 @@ exports.submitApprenticeApplication = (req, res) => {
             mimetype !== 'audio/wav' &&
             mimetype !== 'video/webm' &&
             mimetype !== 'video/mp4' &&
+            mimetype !== 'video/mov' &&
             mimetype !== 'video/swf' &&
             mimetype !== 'application/msword' &&
             mimetype !== 'application/pdf' &&
@@ -510,8 +512,11 @@ exports.submitApprenticeApplication = (req, res) => {
 
                 db.doc(`apprenticeships/${req.params.id}/submissions/${userId}`)
                   .set(newAppilcation)
-                  .then(() => {
+                  .then(async() => {
                     apprenticeshipData.applicantCount++;
+                    await db
+                      .doc(`users/${userId}/applications/${req.params.id}`)
+                      .set(newAppilcation);
                     return apprenticeshipDocument.update({
                       applicantCount: apprenticeshipData.applicantCount,
                     });

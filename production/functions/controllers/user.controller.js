@@ -61,7 +61,7 @@ exports.signup = (req, res) => {
         <p>LEVLS</p>
       `,
   };
-
+  
   const newUser = {
     firstName: req.body.firstName,
     lastName: req.body.lastName,
@@ -79,6 +79,7 @@ exports.signup = (req, res) => {
   const noImg = 'default.jpg';
   const bkgImage = 'background.jpg';
   let userId, uid;
+  let profileUrl;
 
   if (!valid) {
     return res.status(400).json(errors);
@@ -98,18 +99,16 @@ exports.signup = (req, res) => {
             displayName: newUser.username,
             disabled: false,
           })
-          .then((userRecord) => {
+          .then(async(userRecord) => {
             userId = userRecord.uid;
             uid = userRecord.uid;
-          })
-          .then(async () => {
             const userCredentials = {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               firstName: newUser.firstName,
               lastName: newUser.lastName,
               fullname: newUser.firstName + ' ' + newUser.lastName,
-              Pronouns: '',
+              pronouns: '',
               username: newUser.username,
               occupation: '',
               dateOfbirth: newUser.dateOfBirth,
@@ -139,11 +138,34 @@ exports.signup = (req, res) => {
               tiktok: '',
               twitter: '',
               linkedIn: '',
-              profileUrl: '',
               signUpCode: newUser.signUpCode,
               isCvPrivate: true,
             };
-            await db.doc(`/users/${userId}`).set(userCredentials);
+            const userLink = `https://levls.io/profile/${userId}`;
+            let options = {
+              method: 'POST',
+              url: `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${config.apiKey}`,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                dynamicLinkInfo: {
+                  domainUriPrefix: 'https://levlsapp.page.link',
+                  link: userLink,
+                  androidInfo: {
+                    androidPackageName: 'com.pandabares.justappli',
+                  },
+                },
+              }),
+            };
+            request(options, async function (error, response) {
+              if (error) throw new Error(error);
+              const data = JSON.parse(response.body);
+              profileUrl = data.shortLink ? data.shortLink : userLink;
+              await db.doc(`/users/${userId}`).set({ ...userCredentials, profileUrl });
+            });
+          })
+          .then(async () => {
             await db
               .doc(`users/${userId}/followings/${config.levlsUserId}`)
               .set({
@@ -158,10 +180,10 @@ exports.signup = (req, res) => {
               });
               await db.doc(`users/${userId}/digital-cv/${userId}`).set({
                 createdAt: new Date().toISOString(),
-                firstName: userCredentials.firstName,
-                lastName: userCredentials.lastName,
+                firstName: newUser.firstName,
+                lastName: newUser.lastName,
                 occupation: '',
-                imageUrl: userCredentials.imageUrl,
+                imageUrl: `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/${noImg}?alt=media&token=${config.defaultimgtoken}`,
                 isCvPrivate: true,
                 bio: '',
                 profileVideo: '',
@@ -588,44 +610,46 @@ exports.getUserData = (req, res) => {
       }
     })
     .then((data) => {
-      userData.educations = [];
-      data.forEach((doc) => {
-        userData.educations.push({
-          educationId: doc.id,
-          courseName: doc.data().courseName,
-          schoolName: doc.data().schoolName,
-          schoolLocation: doc.data().schoolLocation,
-          createdAt: doc.data().createdAt,
-          startYear: doc.data().startYear,
-          endYear: doc.data().endYear,
-          finalGrade: doc.data().finalGrade,
-          gradeAchieved: doc.data().gradeAchieved,
-          fieldOfStudy:doc.data().fieldOfStudy,
-        });
-        
-      });
+      if (!data.empty) {
+        userData.educations = [];
+        data.forEach((doc) => {
+          userData.educations.push({
+            educationId: doc.id,
+            courseName: doc.data().courseName,
+            schoolName: doc.data().schoolName,
+            schoolLocation: doc.data().schoolLocation,
+            createdAt: doc.data().createdAt,
+            startYear: doc.data().startYear,
+            endYear: doc.data().endYear,
+            finalGrade: doc.data().finalGrade,
+            gradeAchieved: doc.data().gradeAchieved,
+            fieldOfStudy: doc.data().fieldOfStudy,
+          });
+        });       
+      }
       return db
         .collection(`users/${req.params.userId}/experiences`)
-        .orderBy("createdAt", "desc")
+        .orderBy('createdAt', 'desc')
         .limit(4)
         .get();
     })
     .then((data) => {
-      userData.experiences = [];
-      data.forEach((doc) => {
-        userData.experiences.push({
-          experienceId: doc.id,
-          companyName: doc.data().companyName,
-          currentRole: doc.data().currentRole,
-          employmentType: doc.data().employmentType,
-          createdAt: doc.data().createdAt,
-          startDate: doc.data().startDate,
-          endDate: doc.data().endDate,
-          jobTitle: doc.data().jobTitle,
-          location: doc.data().location,
+      if (!data.empty) {
+        userData.experiences = [];
+        data.forEach((doc) => {
+          userData.experiences.push({
+            experienceId: doc.id,
+            companyName: doc.data().companyName,
+            currentRole: doc.data().currentRole,
+            employmentType: doc.data().employmentType,
+            createdAt: doc.data().createdAt,
+            startDate: doc.data().startDate,
+            endDate: doc.data().endDate,
+            jobTitle: doc.data().jobTitle,
+            location: doc.data().location,
+          });
         });
-        
-      });
+      }
       return db
         .collection(`users/${req.params.userId}/skills`)
         .orderBy("createdAt", "desc")
@@ -633,17 +657,18 @@ exports.getUserData = (req, res) => {
         .get();
     })
     .then((data) => {
-      userData.skills = [];
-      data.forEach((doc) => {
-        userData.skills.push({
-          skillId: doc.id,
-          knowledgeList: doc.data().knowledgeList,
-          otherSkillsList: doc.data().otherSkillsList,
-          skillsList: doc.data().skillsList,
-          createdAt: doc.data().createdAt,
+      if (!data.empty) {
+        userData.skills = [];
+        data.forEach((doc) => {
+          userData.skills.push({
+            skillId: doc.id,
+            knowledgeList: doc.data().knowledgeList,
+            otherSkillsList: doc.data().otherSkillsList,
+            skillsList: doc.data().skillsList,
+            createdAt: doc.data().createdAt,
+          });
         });
-        
-      });
+      }
       return res.json(userData)
     })
     .catch((err) => {
@@ -1046,11 +1071,7 @@ exports.deleteNotification = (req, res) => {
 };
 
 exports.activateUser = (req, res) => {
-  let profileUrl;
-
   const userDocument = db.doc(`/users/${req.params.userId}`);
-  let username;
-  let userData;
 
   defaultAuth
     .updateUser(req.params.userId, {
@@ -1059,50 +1080,15 @@ exports.activateUser = (req, res) => {
     .then(() => {
       userDocument
         .get()
-        .then((doc) => {
+        .then(async (doc) => {
           if (doc.exists) {
-            const companyLink = `https://levls.io/company-profile/${req.params.userId}`;
-            const userLink = `https://levls.io/profile/${req.params.userId}`;
-
-            let options = {
-              method: 'POST',
-              url: `https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=${config.apiKey}`,
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                dynamicLinkInfo: {
-                  domainUriPrefix: 'https://levlsapp.page.link',
-                  link:
-                    doc.data().userType === 'Organisation'
-                      ? companyLink
-                      : userLink,
-                  androidInfo: {
-                    androidPackageName: 'com.pandabares.justappli',
-                  },
-                },
-              }),
-            };
-            userData = doc.data();
-            username = userData.username;
-            userData.userId = doc.id;
-            const url = `https://levls.io/${
-              doc.data().userType === 'Organisation'
-                ? 'company-profile'
-                : 'profile'
-            }/${req.params.userId}`;
-            request(options, function (error, response) {
-              if (error) throw new Error(error);
-              const data = JSON.parse(response.body);
-              // console.log(data)
-              profileUrl = data.shortLink ? data.shortLink : url;
-              userDocument.update({
-                isActive: true,
-                verified: true,
-                profileUrl: profileUrl,
-              });
+            await userDocument.update({
+              isActive: true,
+              verified: true,
             });
-            db.doc(`/usernames/${username}`).update({ isActive: true });
+            await db
+              .doc(`/usernames/${doc.data().username}`)
+              .update({ isActive: true });
             return res
               .status(202)
               .json({ success: 'your account is now active you may log in' });

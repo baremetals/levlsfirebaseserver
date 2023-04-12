@@ -38,61 +38,61 @@ exports.verifyEmail = functions
       });
   });
 
-exports.addUserToSendgrid = functions
-  .region('europe-west2')
-  .firestore.document('users/{userId}')
-  .onCreate(async (snap, _ctx) => {
-    const user = snap.data();
-    if (user.userType === 'Personal') {
-      const data = {
-        list_ids: ['e5ad3bb1-b361-47de-9fa3-a900234ed6f0'],
-        contacts: [
-          {
-            email: user.email,
-            first_name: user.firstName,
-            last_name: user.lastName,
-            unique_name: user.username,
-            custom_fields: {
-              e8_T: 'www.waveytests.com',
-              // mobile: '9.5',
-              // username: 'machine gun kelly',
-              // fullname: 'Fucking Legends',
-            },
-          },
-        ],
-      };
-      try {
-        const response = await addToSendgrid(data);
-        console.log(response);
-      } catch (err) {
-        console.log(err);
-      }
-    } else {
-      const data = {
-        list_ids: ['e5ad3bb1-b361-47de-9fa3-a900234ed6f0'],
-        contacts: [
-          {
-            email: user.email,
-            first_name: user.firstName,
-            last_name: user.lastName,
-            unique_name: user.username,
-            custom_fields: {
-              e8_T: 'www.waveytests.com',
-              // mobile: '9.5',
-              // username: 'machine gun kelly',
-              // fullname: 'Fucking Legends',
-            },
-          },
-        ],
-      };
-      try {
-        const response = await addToSendgrid(data);
-        console.log(response);
-      } catch (err) {
-        console.log(err);
-      }
-    }
-  });
+// exports.addUserToSendgrid = functions
+//   .region('europe-west2')
+//   .firestore.document('users/{userId}')
+//   .onCreate(async (snap, _ctx) => {
+//     const user = snap.data();
+//     if (user.userType === 'Personal') {
+//       const data = {
+//         list_ids: ['e5ad3bb1-b361-47de-9fa3-a900234ed6f0'],
+//         contacts: [
+//           {
+//             email: user.email,
+//             first_name: user.firstName,
+//             last_name: user.lastName,
+//             unique_name: user.username,
+//             custom_fields: {
+//               e8_T: 'www.waveytests.com',
+//               // mobile: '9.5',
+//               // username: 'machine gun kelly',
+//               // fullname: 'Fucking Legends',
+//             },
+//           },
+//         ],
+//       };
+//       try {
+//         const response = await addToSendgrid(data);
+//         console.log(response);
+//       } catch (err) {
+//         console.log(err);
+//       }
+//     } else {
+//       const data = {
+//         list_ids: ['e5ad3bb1-b361-47de-9fa3-a900234ed6f0'],
+//         contacts: [
+//           {
+//             email: user.email,
+//             first_name: user.firstName,
+//             last_name: user.lastName,
+//             unique_name: user.username,
+//             custom_fields: {
+//               e8_T: 'www.waveytests.com',
+//               // mobile: '9.5',
+//               // username: 'machine gun kelly',
+//               // fullname: 'Fucking Legends',
+//             },
+//           },
+//         ],
+//       };
+//       try {
+//         const response = await addToSendgrid(data);
+//         console.log(response);
+//       } catch (err) {
+//         console.log(err);
+//       }
+//     }
+//   });
 
 exports.welcomeEmail = functions
   .region('europe-west2')

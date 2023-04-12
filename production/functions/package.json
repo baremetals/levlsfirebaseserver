@@ -15,6 +15,7 @@
   "dependencies": {
     "@sendgrid/mail": "^7.4.2",
     "algoliasearch": "^4.9.1",
+    "axios": "^0.27.2",
     "busboy": "^0.3.1",
     "cors": "^2.8.5",
     "dayjs": "^1.11.2",

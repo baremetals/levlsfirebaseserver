@@ -1,6 +1,6 @@
 const { admin, db } = require('../utils/admin');
 const config = require("../utils/database");
-const { uuid } = require('uuidv4');
+const { v4 } = require('uuid');
 const sgMail = require('@sendgrid/mail');
 
 exports.getAllEvents = (_req, res) => {
@@ -47,22 +47,23 @@ exports.getAllOrgEvents = (req, res) => {
 
 exports.createEvent = (req, res) => {
   let post_time_stamp = new Date().toISOString();
-  const BusBoy = require("busboy");
-  const path = require("path");
-  const os = require("os");
-  const fs = require("fs");
-  
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+
   const busboy = new BusBoy({ headers: req.headers });
-  const imageUrl = req.user.imageUrl
-  const userId = req.user.userId
-  const username = req.user.username
+  const imageUrl = req.user.imageUrl;
+  const userId = req.user.userId;
+  const username = req.user.username;
   const isPartner = req.user.isPartner;
   let docId;
 
   let imageToBeUploaded = {};
   let imageFileName;
-  let generatedToken = uuid();
+  let generatedToken = v4();
   let newEvent = {};
+  let resEvent;
 
   const adminMsg = {
     to: 'admin@levls.io', // recipient
@@ -82,18 +83,35 @@ exports.createEvent = (req, res) => {
         <p>LEVLS</p>
       `,
   };
-  
 
-  busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
-    // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
-    newEvent[fieldname] = val
-  });
-
-  busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
-    if (mimetype !== "image/jpeg" && mimetype !== "image/jpg" && mimetype !== "image/png" && mimetype !== "video/mp4" && mimetype !== "video/swf") {
-      return res.status(400).json({ error: "Wrong file type submitted" });
+  busboy.on(
+    'field',
+    function (
+      fieldname,
+      val,
+      _fieldnameTruncated,
+      _valTruncated,
+      _encoding,
+      _mimetype
+    ) {
+      // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
+      newEvent[fieldname] = val;
     }
-    const imageExtension = filename.split(".")[filename.split(".").length - 1];
+  );
+
+  busboy.on('file', (_fieldname, file, filename, _encoding, mimetype) => {
+    if (
+      mimetype !== 'image/jpeg' &&
+      mimetype !== 'image/jpg' &&
+      mimetype !== 'image/png' &&
+      mimetype !== 'video/webm' &&
+      mimetype !== 'video/mov' &&
+      mimetype !== 'video/mp4' &&
+      mimetype !== 'video/swf'
+    ) {
+      return res.status(400).json({ error: 'Wrong file type submitted' });
+    }
+    const imageExtension = filename.split('.')[filename.split('.').length - 1];
     // 32756238461724837.png
     imageFileName = `${Math.round(
       Math.random() * 1000000000000
@@ -114,16 +132,17 @@ exports.createEvent = (req, res) => {
             //Generate token to be appended to imageUrl
             firebaseStorageDownloadTokens: generatedToken,
           },
-        }, 
+        },
       })
       .catch((err) => {
-        res.status(500).json({ error: 'Erm... That was strange, please try again later! ' });
+        res
+          .status(500)
+          .json({ error: 'Erm... That was strange, please try again later! ' });
         console.error(err);
       });
-    
   });
 
-  busboy.on("finish", () => {
+  busboy.on('finish', () => {
     const slug =
       newEvent.title
         .toLowerCase()
@@ -139,23 +158,23 @@ exports.createEvent = (req, res) => {
     newEvent.contentType = 'event';
     newEvent.imageUrl = imageUrl;
     newEvent.createdAt = new Date().toISOString();
-    newEvent.post_time_stamp = Date.parse(post_time_stamp)
-    newEvent.likeCount = 0
-    newEvent.commentCount = 0
-    newEvent.viewsCount = 0
-    newEvent.isActive = false
-    newEvent.isPartner = isPartner
+    newEvent.post_time_stamp = Date.parse(post_time_stamp);
+    newEvent.likeCount = 0;
+    newEvent.commentCount = 0;
+    newEvent.viewsCount = 0;
+    newEvent.isActive = false;
+    newEvent.isPartner = isPartner;
     newEvent.pageUrl = `events/${slug}`;
     newEvent.state = 'draft';
     db.collection('events')
       .add(newEvent)
-      .then((doc) => {
-        const resEvent = newEvent;
+      .then(async (doc) => {
+        resEvent = newEvent;
         resEvent.timelineId = doc.id;
-        docId = doc.id
+        docId = doc.id;
+        await db.doc(`mobile timeline/${docId}`).set(resEvent);
       })
       .then(async () => {
-        await db.doc(`mobile timeline/${docId}`).set(resEvent);
         await sgMail.send(adminMsg);
         return res.status(201).json(resEvent);
       })
@@ -437,3 +456,188 @@ exports.deleteEventComment = (req, res) => {
 }
 
 
+exports.editEvent = (req, res) => {
+  let post_time_stamp = new Date().toISOString();
+  const BusBoy = require('busboy');
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+
+
+  if (req.body.customUrl || req.body.customUrl === '') {
+    const newUpload = {
+      uploadUrl: req.body.customUrl || '',
+      caption: req.body.caption || '',
+      title: req.body.title || '',
+      description: req.body.description || '',
+      createdAt: new Date().toISOString(),
+      post_time_stamp: Date.parse(post_time_stamp),
+      username: req.user.username,
+      userId: req.user.userId,
+      imageUrl: req.user.imageUrl,
+      likeCount: 0,
+      commentCount: 0,
+      contentType: 'upload',
+      uploadType: req.body.uploadType,
+      videoViewsCount: 0,
+      uploadThumbnail: req.body.uploadThumbnail || '',
+      addToCV: req.body.addToCV,
+    };
+
+    db.collection('uploads')
+      .add(newUpload)
+      .then((doc) => {
+        resUpload = newUpload;
+        resUpload.timelineId = doc.id;
+        resUpload.pageUrl = `upload/${doc.id}`;
+        docId = doc.id;
+      })
+      .then(async () => {
+        await db.doc(`mobile timeline/${docId}`).set(resUpload);
+        if (req.user.userType === 'Personal' && req.body.addToCV === 'true') {
+          await db
+            .doc(`users/${req.user.userId}/digital-cv/${docId}`)
+            .set({ ...resUpload, content: 'upload' });
+        }
+        return res.json(resUpload);
+      })
+      .catch((err) => {
+        console.log(err);
+        res.status(500).json({ error: 'Something went wrong' });
+      });
+  }
+
+  const busboy = new BusBoy({ headers: req.headers });
+  const imageUrl = req.user.imageUrl;
+  const userId = req.user.userId;
+  const username = req.user.username;
+  const isPartner = req.user.isPartner;
+  let docId;
+
+  let imageToBeUploaded = {};
+  let imageFileName;
+  let generatedToken = v4();
+  let newEvent = {};
+  let resEvent;
+
+  const adminMsg = {
+    to: 'admin@levls.io', // recipient
+    from: 'LEVLS. <noreply@levls.io>',
+    subject: `New Event - ${req.body.title}`,
+    text: `${
+      req.user.organisationName || req.body.username
+    }, just created an event`,
+    html: `
+        <h3> Hello Admin </h3>
+        <p>A new event has been created by ${
+          req.user.organisationName || req.user.username
+        }. Please review and activate </p>
+
+        <a href=https://justappli-b9f5c.web.app/admin/events/"> Visit </a>
+        <p>Thank You.</p>
+        <p>LEVLS</p>
+      `,
+  };
+
+  busboy.on(
+    'field',
+    function (
+      fieldname,
+      val,
+      _fieldnameTruncated,
+      _valTruncated,
+      _encoding,
+      _mimetype
+    ) {
+      // console.log('Field [' + fieldname + ']: value: ' + inspect(val));
+      newEvent[fieldname] = val;
+    }
+  );
+
+  busboy.on('file', (_fieldname, file, filename, _encoding, mimetype) => {
+    if (
+      mimetype !== 'image/jpeg' &&
+      mimetype !== 'image/jpg' &&
+      mimetype !== 'image/png' &&
+      mimetype !== 'video/webm' &&
+      mimetype !== 'video/mov' &&
+      mimetype !== 'video/mp4' &&
+      mimetype !== 'video/swf'
+    ) {
+      return res.status(400).json({ error: 'Wrong file type submitted' });
+    }
+    const imageExtension = filename.split('.')[filename.split('.').length - 1];
+    // 32756238461724837.png
+    imageFileName = `${Math.round(
+      Math.random() * 1000000000000
+    ).toString()}.${imageExtension}`;
+    const filepath = path.join(os.tmpdir(), path.basename(imageFileName));
+    imageToBeUploaded = { filepath, mimetype };
+    file.pipe(fs.createWriteStream(filepath));
+
+    admin
+      .storage()
+      .bucket(config.storageBucket)
+      .upload(imageToBeUploaded.filepath, {
+        destination: `events/${imageFileName}`,
+        resumable: false,
+        metadata: {
+          metadata: {
+            contentType: imageToBeUploaded.mimetype,
+            //Generate token to be appended to imageUrl
+            firebaseStorageDownloadTokens: generatedToken,
+          },
+        },
+      })
+      .catch((err) => {
+        res
+          .status(500)
+          .json({ error: 'Erm... That was strange, please try again later! ' });
+        console.error(err);
+      });
+  });
+
+  busboy.on('finish', () => {
+    const slug =
+      newEvent.title
+        .toLowerCase()
+        .replace(/[^\w ]+/g, '')
+        .replace(/ +/g, '-') +
+      '-' +
+      Date.parse(post_time_stamp);
+    const eventMediaUrl = `${config.firebaseUrl}/v0/b/${config.storageBucket}/o/events%2F${imageFileName}?alt=media&token=${generatedToken}`;
+    newEvent.eventMediaUrl = eventMediaUrl;
+    newEvent.userId = userId;
+    newEvent.username = username;
+    newEvent.slug = slug;
+    newEvent.contentType = 'event';
+    newEvent.imageUrl = imageUrl;
+    newEvent.createdAt = new Date().toISOString();
+    newEvent.post_time_stamp = Date.parse(post_time_stamp);
+    newEvent.likeCount = 0;
+    newEvent.commentCount = 0;
+    newEvent.viewsCount = 0;
+    newEvent.isActive = false;
+    newEvent.isPartner = isPartner;
+    newEvent.pageUrl = `events/${slug}`;
+    newEvent.state = 'draft';
+    db.collection('events')
+      .add(newEvent)
+      .then(async (doc) => {
+        resEvent = newEvent;
+        resEvent.timelineId = doc.id;
+        docId = doc.id;
+        await db.doc(`mobile timeline/${docId}`).set(resEvent);
+      })
+      .then(async () => {
+        await sgMail.send(adminMsg);
+        return res.status(201).json(resEvent);
+      })
+      .catch((err) => {
+        res.status(500).json({ error: 'something went wrong' });
+        console.error(err);
+      });
+  });
+
+  busboy.end(req.rawBody);
+};

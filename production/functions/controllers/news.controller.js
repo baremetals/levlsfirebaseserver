@@ -512,10 +512,16 @@ exports.deletePost = (req, res) => {
   const document = db.doc(`/news/${req.params.newsId}`);
   document
     .get()
-    .then((doc) => {
+    .then(async (doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Post not found' });
       } else {
+        await db
+          .doc(`mobile timeline/${doc.id}`)
+          .get()
+          .then(async (dc) => {
+            if (dc.exists) return db.doc(`mobile timeline/${doc.id}`).delete();
+          });
         return document.delete();
       }
     })
@@ -531,20 +537,23 @@ exports.deletePost = (req, res) => {
 // Update news post
 exports.updatePost = (req, res) => {
   let postDetails = req.body;
-  const newsDocument = db.doc(`/news/${req.params.newsId}`)
+  const newsDocument = db.doc(`/news/${req.params.newsId}`);
 
   newsDocument
     .get()
-    .then((doc) => {
+    .then(async (doc) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Post not found' });
       }
-      newsDocument.update(postDetails)
-      return db.doc(`/mobile timeline/${req.params.newsId}`).update(postDetails);
-      
+      await newsDocument.update(postDetails);
+      return db.doc(`/mobile timeline/${req.params.newsId}`).get();
     })
-    .then(() => {
-      return res.json({ message: "Post updated successfully" });
+    .then(async (d) => {
+      if (d.exists)
+        await db
+          .doc(`/mobile timeline/${req.params.newsId}`)
+          .update(postDetails);
+      return res.json({ message: 'Post updated successfully' });
     })
     .catch((err) => {
       console.error(err);
